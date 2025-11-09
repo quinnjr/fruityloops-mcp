@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/quinnjr/fruityloops-mcp/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📚 Documentation
+    url: https://quinnjr.github.io/fruityloops-mcp/
+    about: Read the full documentation
+  - name: 🆘 Support
+    url: https://github.com/quinnjr/fruityloops-mcp/discussions/categories/q-a
+    about: Get help with using FL Studio MCP Server
+
