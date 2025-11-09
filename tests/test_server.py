@@ -30,8 +30,13 @@ class TestFLStudioMCPServer:
 
     @pytest.mark.asyncio
     @patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", False)
-    async def test_fl_tools_unavailable(self):
+    @patch("fruityloops_mcp.server.MIDIInterface")
+    async def test_fl_tools_unavailable(self, mock_midi_class):
         """Test that FL Studio tools report unavailability when FL not running."""
+        # Mock the MIDI interface to avoid accessing real hardware in CI
+        mock_midi = mock_midi_class.return_value
+        mock_midi.list_ports.return_value = {"input": [], "output": []}
+
         server = FLStudioMCPServer()
         # With FL Studio unavailable, FL tools should raise or return error
         # MIDI tools should still work
