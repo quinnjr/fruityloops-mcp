@@ -1,9 +1,10 @@
 """Tests for the FL Studio MCP server."""
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch
 
-from fruityloops_mcp.server import FLStudioMCPServer, FL_STUDIO_AVAILABLE
+import pytest
+
+from fruityloops_mcp.server import FLStudioMCPServer
 
 
 class TestFLStudioMCPServer:
@@ -35,4 +36,3 @@ class TestFLStudioMCPServer:
         server = FLStudioMCPServer()
         result = await server.call_tool("transport_start", {})
         assert "not available" in result[0].text or "cannot be executed" in result[0].text
-

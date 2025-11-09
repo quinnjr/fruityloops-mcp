@@ -37,7 +37,7 @@ except ImportError:
         def __getattr__(self, item: str) -> "StubModule":
             return self
 
-        def __call__(self, *args: Any, **kwargs: Any) -> "StubModule":
+        def __call__(self, *_args: Any, **_kwargs: Any) -> "StubModule":
             return self
 
     transport = StubModule("transport")
@@ -716,4 +716,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

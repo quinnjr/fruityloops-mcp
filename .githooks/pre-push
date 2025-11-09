@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Pre-push hook to enforce git-flow branching and prevent direct pushes to protected branches
+#
+
+# Get current branch
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD)
+
+echo "Checking push to branch: $CURRENT_BRANCH"
+
+# Check if pushing to protected branches
+if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "develop" ]; then
+    echo "[ERROR] Direct pushes to '$CURRENT_BRANCH' are not allowed!"
+    echo ""
+    echo "Please use a feature/bugfix/hotfix branch and create a Pull Request."
+    echo ""
+    echo "Example workflow:"
+    echo "  git checkout -b feature/my-feature"
+    echo "  git add ."
+    echo "  git commit -m 'feat: add my feature'"
+    echo "  git push origin feature/my-feature"
+    echo "  # Then create a PR on GitHub"
+    exit 1
+fi
+
+# Validate branch name follows git-flow conventions
+VALID_BRANCH_PATTERN="^(feature|bugfix|hotfix|release)/.+"
+
+if ! echo "$CURRENT_BRANCH" | grep -qE "$VALID_BRANCH_PATTERN"; then
+    echo "[ERROR] Invalid branch name: $CURRENT_BRANCH"
+    echo ""
+    echo "Branch names must follow git-flow conventions:"
+    echo "  feature/<name>  - New features"
+    echo "  bugfix/<name>   - Bug fixes"
+    echo "  hotfix/<name>   - Urgent production fixes"
+    echo "  release/<version> - Release preparation"
+    echo ""
+    echo "Example: feature/add-midi-support"
+    exit 1
+fi
+
+echo "[OK] Branch name is valid: $CURRENT_BRANCH"
+
+# Run tests before pushing
+if command -v uv &> /dev/null; then
+    echo "Running tests before push..."
+    if ! uv run pytest --quiet; then
+        echo "[ERROR] Tests failed! Fix failing tests before pushing."
+        exit 1
+    fi
+    echo "[OK] All tests passed!"
+fi
+
+exit 0
+

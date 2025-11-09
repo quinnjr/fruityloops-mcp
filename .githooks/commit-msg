@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Commit message hook to enforce Conventional Commits format
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Conventional Commits pattern
+PATTERN="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?!?: .+"
+
+if ! echo "$COMMIT_MSG" | grep -qE "$PATTERN"; then
+    echo "[ERROR] Invalid commit message format!"
+    echo ""
+    echo "Commit message must follow Conventional Commits:"
+    echo "  type(scope): description"
+    echo ""
+    echo "Valid types: feat, fix, docs, style, refactor, test, chore, perf, ci, build"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add MIDI support"
+    echo "  fix(server): resolve connection issue"
+    echo "  docs: update installation guide"
+    echo ""
+    echo "Your message:"
+    echo "  $COMMIT_MSG"
+    exit 1
+fi
+
+exit 0
+

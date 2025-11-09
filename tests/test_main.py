@@ -48,9 +48,7 @@ class TestServerMain:
 
     @patch("fruityloops_mcp.server.FLStudioMCPServer")
     @patch("fruityloops_mcp.server.asyncio.run")
-    def test_main_function_handles_keyboard_interrupt(
-        self, mock_asyncio_run, mock_server_class
-    ):
+    def test_main_function_handles_keyboard_interrupt(self, mock_asyncio_run, mock_server_class):
         """Test that main() handles KeyboardInterrupt."""
         from fruityloops_mcp.server import main
 
@@ -59,4 +57,3 @@ class TestServerMain:
         # Should raise KeyboardInterrupt
         with pytest.raises(KeyboardInterrupt):
             main()
-

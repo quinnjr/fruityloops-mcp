@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Prepare commit message hook to help with conventional commits
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Only run for regular commits (not merges, squashes, etc.)
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+    exit 0
+fi
+
+# Get current branch name
+BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# Extract issue number from branch name if present
+ISSUE_NUM=$(echo "$BRANCH_NAME" | grep -oE '[0-9]+' | head -1)
+
+# If commit message is empty and we have an issue number, suggest format
+if [ -z "$(cat "$COMMIT_MSG_FILE")" ] && [ -n "$ISSUE_NUM" ]; then
+    echo "# Conventional Commit Format:" > "$COMMIT_MSG_FILE"
+    echo "# type(scope): description" >> "$COMMIT_MSG_FILE"
+    echo "#" >> "$COMMIT_MSG_FILE"
+    echo "# Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build" >> "$COMMIT_MSG_FILE"
+    echo "#" >> "$COMMIT_MSG_FILE"
+    echo "# Example: feat: add new feature (refs #$ISSUE_NUM)" >> "$COMMIT_MSG_FILE"
+    echo "" >> "$COMMIT_MSG_FILE"
+fi
+
+exit 0
+

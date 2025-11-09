@@ -1,6 +1,5 @@
 """Tests for the MIDI interface."""
 
-import pytest
 from unittest.mock import Mock, patch
 
 from fruityloops_mcp.midi_interface import MIDIInterface
@@ -88,4 +87,3 @@ class TestMIDIInterface:
 
         assert ports["input"] == ["Input1", "Input2"]
         assert ports["output"] == ["Output1", "Output2"]
-

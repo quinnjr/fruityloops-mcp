@@ -1,9 +1,10 @@
 """Tests to improve server coverage."""
 
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
-from fruityloops_mcp.server import FL_STUDIO_AVAILABLE, FLStudioMCPServer, StubModule
+import pytest
+
+from fruityloops_mcp.server import FLStudioMCPServer, StubModule
 
 
 @pytest.fixture
@@ -114,9 +115,7 @@ class TestAllServerTools:
         assert "Total channels: 10" in result
 
         mock_fl_modules["channels"].getChannelName.return_value = "Synth"
-        result = await server_with_fl._execute_tool(
-            "channels_get_channel_name", {"channel_num": 0}
-        )
+        result = await server_with_fl._execute_tool("channels_get_channel_name", {"channel_num": 0})
         assert "Channel 0 name: Synth" in result
 
         await server_with_fl._execute_tool(
@@ -137,9 +136,7 @@ class TestAllServerTools:
         assert "Total patterns: 5" in result
 
         mock_fl_modules["patterns"].getPatternName.return_value = "Intro"
-        result = await server_with_fl._execute_tool(
-            "patterns_get_pattern_name", {"pattern_num": 0}
-        )
+        result = await server_with_fl._execute_tool("patterns_get_pattern_name", {"pattern_num": 0})
         assert "Pattern 0 name: Intro" in result
 
         await server_with_fl._execute_tool(
@@ -168,9 +165,7 @@ class TestAllServerTools:
     async def test_playlist_tools(self, server_with_fl, mock_fl_modules):
         """Test playlist control tools."""
         mock_fl_modules["playlist"].getTrackName.return_value = "Lead Synth"
-        result = await server_with_fl._execute_tool(
-            "playlist_get_track_name", {"track_num": 0}
-        )
+        result = await server_with_fl._execute_tool("playlist_get_track_name", {"track_num": 0})
         assert "Playlist track 0 name: Lead Synth" in result
 
 
@@ -193,7 +188,7 @@ class TestServerInitialization:
         with patch("fruityloops_mcp.server.MIDIInterface") as MockMIDI:
             mock_instance = MockMIDI.return_value
             mock_instance.port_name = "FLStudio_MIDI"
-            server = FLStudioMCPServer()
+            FLStudioMCPServer()
             MockMIDI.assert_called_once_with(port_name="FLStudio_MIDI")
 
     def test_server_initialization_with_custom_midi_port(self):
@@ -202,6 +197,5 @@ class TestServerInitialization:
         with patch("fruityloops_mcp.server.MIDIInterface") as MockMIDI:
             mock_instance = MockMIDI.return_value
             mock_instance.port_name = custom_port
-            server = FLStudioMCPServer(midi_port=custom_port)
+            FLStudioMCPServer(midi_port=custom_port)
             MockMIDI.assert_called_once_with(port_name=custom_port)
-

@@ -1,7 +1,8 @@
 """Integration tests for the FL Studio MCP server."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 
 from fruityloops_mcp.server import FLStudioMCPServer
 
@@ -9,14 +10,16 @@ from fruityloops_mcp.server import FLStudioMCPServer
 @pytest.fixture
 def mock_fl_modules():
     """Mock FL Studio API modules."""
-    with patch("fruityloops_mcp.server.transport") as mock_transport, \
-         patch("fruityloops_mcp.server.mixer") as mock_mixer, \
-         patch("fruityloops_mcp.server.channels") as mock_channels, \
-         patch("fruityloops_mcp.server.patterns") as mock_patterns, \
-         patch("fruityloops_mcp.server.general") as mock_general, \
-         patch("fruityloops_mcp.server.ui") as mock_ui, \
-         patch("fruityloops_mcp.server.playlist") as mock_playlist, \
-         patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True):
+    with (
+        patch("fruityloops_mcp.server.transport") as mock_transport,
+        patch("fruityloops_mcp.server.mixer") as mock_mixer,
+        patch("fruityloops_mcp.server.channels") as mock_channels,
+        patch("fruityloops_mcp.server.patterns") as mock_patterns,
+        patch("fruityloops_mcp.server.general") as mock_general,
+        patch("fruityloops_mcp.server.ui") as mock_ui,
+        patch("fruityloops_mcp.server.playlist") as mock_playlist,
+        patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True),
+    ):
         yield {
             "transport": mock_transport,
             "mixer": mock_mixer,
@@ -92,11 +95,10 @@ class TestEdgeCases:
         """Test with very long names."""
         server = FLStudioMCPServer()
         long_name = "A" * 1000
-        
-        result = await server._execute_tool("mixer_set_track_name", {
-            "track_num": 0,
-            "name": long_name
-        })
+
+        result = await server._execute_tool(
+            "mixer_set_track_name", {"track_num": 0, "name": long_name}
+        )
         assert "set to" in result
         mock_fl_modules["mixer"].setTrackName.assert_called_once_with(0, long_name)
 
@@ -104,11 +106,9 @@ class TestEdgeCases:
     async def test_zero_values(self, mock_fl_modules, mock_midi):
         """Test with zero values."""
         server = FLStudioMCPServer()
-        
-        result = await server._execute_tool("mixer_set_track_volume", {
-            "track_num": 0,
-            "volume": 0.0
-        })
+
+        result = await server._execute_tool(
+            "mixer_set_track_volume", {"track_num": 0, "volume": 0.0}
+        )
         assert "set to" in result
         mock_fl_modules["mixer"].setTrackVolume.assert_called_once_with(0, 0.0)
-

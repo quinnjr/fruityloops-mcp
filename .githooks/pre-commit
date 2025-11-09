@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Pre-commit hook to run linting and formatting checks
+#
+
+echo "Running pre-commit checks..."
+
+# Check if uv is available
+if ! command -v uv &> /dev/null; then
+    echo "[WARNING] uv not found, skipping lint checks"
+    exit 0
+fi
+
+# Run ruff linter
+echo "Running ruff linter..."
+if ! uv run ruff check .; then
+    echo "[ERROR] Linting failed! Fix the issues and try again."
+    echo "Run: uv run ruff check --fix . to auto-fix some issues"
+    exit 1
+fi
+
+# Run ruff formatter check
+echo "Running ruff formatter..."
+if ! uv run ruff format --check .; then
+    echo "[ERROR] Code formatting check failed!"
+    echo "Run: uv run ruff format . to format your code"
+    exit 1
+fi
+
+echo "[OK] All pre-commit checks passed!"
+exit 0
+

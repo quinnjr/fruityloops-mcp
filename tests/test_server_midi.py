@@ -1,9 +1,9 @@
 """Tests for MIDI-related server tools."""
 
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 
 from fruityloops_mcp.server import FLStudioMCPServer
 
@@ -149,9 +149,7 @@ class TestServerMIDIEdgeCases:
 
     @pytest.mark.asyncio
     @patch("asyncio.sleep", new_callable=AsyncMock)
-    async def test_midi_send_note_with_zero_duration(
-        self, mock_sleep, server, mock_midi_interface
-    ):
+    async def test_midi_send_note_with_zero_duration(self, mock_sleep, server, mock_midi_interface):
         """Test midi_send_note with zero duration."""
         args = {"note": 60, "duration": 0}
         result = await server._execute_tool("midi_send_note", args)
@@ -162,9 +160,7 @@ class TestServerMIDIEdgeCases:
 
     @pytest.mark.asyncio
     @patch("asyncio.sleep", new_callable=AsyncMock)
-    async def test_midi_send_note_with_long_duration(
-        self, mock_sleep, server, mock_midi_interface
-    ):
+    async def test_midi_send_note_with_long_duration(self, mock_sleep, server, mock_midi_interface):
         """Test midi_send_note with a very long duration."""
         args = {"note": 60, "duration": 1000}
         result = await server._execute_tool("midi_send_note", args)
@@ -180,16 +176,13 @@ class TestServerMIDIEdgeCases:
         with patch("fruityloops_mcp.server.MIDIInterface") as MockMIDI:
             mock_instance = MockMIDI.return_value
             mock_instance.port_name = custom_port_name
-            server = FLStudioMCPServer(midi_port=custom_port_name)
+            FLStudioMCPServer(midi_port=custom_port_name)
             MockMIDI.assert_called_once_with(port_name=custom_port_name)
 
     @pytest.mark.asyncio
     async def test_concurrent_midi_operations(self, server, mock_midi_interface):
         """Test concurrent MIDI operations through the server."""
-        tasks = [
-            server._execute_tool("midi_send_note_on", {"note": 60 + i}) for i in range(10)
-        ]
+        tasks = [server._execute_tool("midi_send_note_on", {"note": 60 + i}) for i in range(10)]
         results = await asyncio.gather(*tasks)
         assert all("Sent MIDI note_on" in r for r in results)
         assert mock_midi_interface.send_note_on.call_count == 10
-

@@ -1,7 +1,5 @@
 """Tests for git hooks validation logic."""
 
-import pytest
-
 
 class TestBranchNameValidation:
     """Test branch name validation."""
@@ -137,7 +135,9 @@ class TestCommitMessageValidation:
         """Check if commit message follows conventional commits."""
         import re
 
-        pattern = r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?!?: .+$"
+        pattern = (
+            r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?!?: .+$"
+        )
         return bool(re.match(pattern, message))
 
 
@@ -190,4 +190,3 @@ class TestGitFlowRules:
         """Check if direct push is allowed to branch."""
         protected_branches = ["main", "master", "develop"]
         return branch not in protected_branches
-

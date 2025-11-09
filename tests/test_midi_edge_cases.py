@@ -1,10 +1,10 @@
 """Edge case and antipattern tests for MIDI interface."""
 
 import asyncio
+from unittest.mock import MagicMock, Mock, patch
 
 import mido
 import pytest
-from unittest.mock import MagicMock, Mock, patch
 
 from fruityloops_mcp.midi_interface import MIDIInterface
 
@@ -53,7 +53,7 @@ class TestMIDIEdgeCases:
         mock_output.send.side_effect = Exception("Send error")
         mock_mido.open_output.return_value = mock_output
         mock_mido.open_input.return_value = Mock()
-        
+
         midi.connect()
         assert midi.send_note_off(60) is False
 
@@ -78,9 +78,8 @@ class TestMIDIEdgeCases:
         mock_mido.open_input.return_value = Mock()
 
         # Disconnect errors should propagate
-        with pytest.raises(Exception, match="Close error"):
-            with midi as m:
-                assert m.is_connected
+        with pytest.raises(Exception, match="Close error"), midi as m:
+            assert m.is_connected
 
     def test_send_operations_with_none_port(self, midi):
         """Test send operations when port is None."""
@@ -123,7 +122,7 @@ class TestMIDIAntipatterns:
         mock_mido.get_input_names.return_value = ["FLStudio_MIDI"]
         mock_mido.open_output.return_value = Mock()
         mock_mido.open_input.return_value = Mock()
-        
+
         midi.connect()
         # mido itself handles value clamping, so these should still return True
         assert midi.send_note_on(note, velocity, channel) is True
@@ -142,12 +141,11 @@ class TestMIDIAntipatterns:
         mock_output.send = MagicMock()
         mock_mido.open_output.return_value = mock_output
         mock_mido.open_input.return_value = Mock()
-        
+
         midi.connect()
 
         tasks = [
-            asyncio.create_task(asyncio.to_thread(midi.send_note_on, 60 + i))
-            for i in range(100)
+            asyncio.create_task(asyncio.to_thread(midi.send_note_on, 60 + i)) for i in range(100)
         ]
         results = await asyncio.gather(*tasks)
 
@@ -163,7 +161,7 @@ class TestMIDIAntipatterns:
         mock_output.send.side_effect = mido.ports.PortNotOpenError("Port closed")
         mock_mido.open_output.return_value = mock_output
         mock_mido.open_input.return_value = Mock()
-        
+
         midi.connect()
         assert midi.send_note_on(60) is False
         assert not midi.is_connected  # Should reflect the disconnected state
@@ -199,4 +197,3 @@ class TestMIDIBoundaryConditions:
         assert midi.send_control_change(7, 100, channel) is True
         assert midi.send_program_change(0, channel) is True
         assert midi.send_pitch_bend(0, channel) is True
-

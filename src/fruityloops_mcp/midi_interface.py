@@ -48,9 +48,7 @@ class MIDIInterface:
                 return False
 
             if self.port_name not in input_ports:
-                logger.warning(
-                    f"Input port '{self.port_name}' not found. Available: {input_ports}"
-                )
+                logger.warning(f"Input port '{self.port_name}' not found. Available: {input_ports}")
                 return False
 
             # Open ports
@@ -221,4 +219,3 @@ class MIDIInterface:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         self.disconnect()
-
