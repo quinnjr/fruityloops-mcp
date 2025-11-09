@@ -11,20 +11,20 @@ jobs:
       - name: Check PR description
         run: |
           PR_BODY="${{ github.event.pull_request.body }}"
-          
+
           if [ -z "$PR_BODY" ]; then
             echo "✗ PR description is empty"
             echo "Please provide a description for your PR"
             exit 1
           fi
-          
+
           # Check minimum length (at least 20 characters)
           if [ ${#PR_BODY} -lt 20 ]; then
             echo "✗ PR description is too short (${#PR_BODY} characters)"
             echo "Please provide a more detailed description (at least 20 characters)"
             exit 1
           fi
-          
+
           echo "✓ PR description is adequate"
 
   pr-size:
@@ -40,11 +40,11 @@ jobs:
           CHANGED_LINES=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oP '\d+(?= insertion)' || echo "0")
           DELETED_LINES=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oP '\d+(?= deletion)' || echo "0")
           TOTAL_CHANGES=$((CHANGED_LINES + DELETED_LINES))
-          
+
           echo "Changed lines: $CHANGED_LINES"
           echo "Deleted lines: $DELETED_LINES"
           echo "Total changes: $TOTAL_CHANGES"
-          
+
           # Warn if PR is very large (>1000 lines)
           if [ $TOTAL_CHANGES -gt 1000 ]; then
             echo "⚠️  WARNING: This PR is very large ($TOTAL_CHANGES lines changed)"
@@ -60,9 +60,9 @@ jobs:
         run: |
           LABELS_JSON='${{ toJson(github.event.pull_request.labels) }}'
           LABEL_COUNT=$(echo "$LABELS_JSON" | jq '. | length')
-          
+
           echo "Number of labels: $LABEL_COUNT"
-          
+
           if [ "$LABEL_COUNT" -eq 0 ]; then
             echo "⚠️  No labels applied to this PR"
             echo "Consider adding labels like: bug, enhancement, documentation, etc."
@@ -76,7 +76,7 @@ jobs:
       - name: Check for linked issues
         run: |
           PR_BODY="${{ github.event.pull_request.body }}"
-          
+
           # Check for common issue reference patterns
           if echo "$PR_BODY" | grep -qiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)\ #[0-9]+'; then
             echo "✓ PR references an issue"

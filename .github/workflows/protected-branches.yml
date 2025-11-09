@@ -16,16 +16,16 @@ jobs:
           echo "Direct push detected to protected branch: ${{ github.ref_name }}"
           echo "⚠️  WARNING: Direct pushes to protected branches should be avoided."
           echo "Please use Pull Requests for code review."
-          
+
           # Get the commit message
           COMMIT_MSG=$(git log --format=%B -n 1 ${{ github.sha }})
-          
+
           # Allow certain automated commits
           if [[ "$COMMIT_MSG" =~ ^(chore\(release\)|docs:\ update) ]]; then
             echo "✓ Automated commit allowed"
             exit 0
           fi
-          
+
           # Warn but don't fail (enforcement is via branch protection rules)
           echo "💡 Configure branch protection rules to enforce PR-only merges"
 
@@ -41,13 +41,13 @@ jobs:
           # Check if this is a force push by comparing with previous commit
           PREV_COMMIT=$(git rev-parse HEAD^)
           CURRENT_COMMIT=$(git rev-parse HEAD)
-          
+
           # Check if previous commit exists in history
           if ! git merge-base --is-ancestor $PREV_COMMIT $CURRENT_COMMIT 2>/dev/null; then
             echo "✗ Force push detected!"
             echo "Force pushes to protected branches are not allowed."
             exit 1
           fi
-          
+
           echo "✓ No force push detected"
 

@@ -5,7 +5,7 @@ Write-Host "Installing git hooks..." -ForegroundColor Cyan
 try {
     # Configure git to use .githooks directory
     git config core.hooksPath .githooks
-    
+
     Write-Host "[OK] Git hooks installed successfully!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Installed hooks:" -ForegroundColor Yellow
@@ -15,7 +15,7 @@ try {
     Write-Host "  - prepare-commit-msg: Help with commit messages"
     Write-Host ""
     Write-Host "To uninstall: git config --unset core.hooksPath" -ForegroundColor Gray
-    
+
     exit 0
 }
 catch {

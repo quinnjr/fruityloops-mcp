@@ -17,19 +17,19 @@ jobs:
         run: |
           BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
           echo "Validating branch name: $BRANCH_NAME"
-          
+
           # Allow protected branches
           if [[ "$BRANCH_NAME" =~ ^(main|master|develop)$ ]]; then
             echo "✓ Protected branch: $BRANCH_NAME"
             exit 0
           fi
-          
+
           # Check if branch follows git-flow naming
           if [[ "$BRANCH_NAME" =~ ^(feature|bugfix|hotfix|release)/.+ ]]; then
             echo "✓ Valid branch name: $BRANCH_NAME"
             exit 0
           fi
-          
+
           echo "✗ Invalid branch name: $BRANCH_NAME"
           echo "Branch names must follow git-flow conventions:"
           echo "  - feature/<name>"
@@ -46,13 +46,13 @@ jobs:
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
           echo "Validating PR title: $PR_TITLE"
-          
+
           # Check if PR title follows conventional commits
           if [[ "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
             echo "✓ Valid PR title format"
             exit 0
           fi
-          
+
           echo "✗ Invalid PR title format: $PR_TITLE"
           echo "PR titles must follow Conventional Commits:"
           echo "  type(scope): description"

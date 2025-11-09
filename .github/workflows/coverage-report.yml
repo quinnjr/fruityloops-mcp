@@ -48,9 +48,9 @@ jobs:
             const coverage = '${{ steps.coverage.outputs.coverage }}';
             const sha = context.sha.substring(0, 7);
             const branch = context.ref.replace('refs/heads/', '');
-            
+
             const comment = `📊 **Coverage Report** for \`${sha}\` on \`${branch}\`: **${coverage}%**`;
-            
+
             github.rest.repos.createCommitComment({
               owner: context.repo.owner,
               repo: context.repo.repo,

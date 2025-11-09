@@ -12,10 +12,10 @@ jobs:
         run: |
           SOURCE_BRANCH="${{ github.head_ref }}"
           TARGET_BRANCH="${{ github.base_ref }}"
-          
+
           echo "Source: $SOURCE_BRANCH"
           echo "Target: $TARGET_BRANCH"
-          
+
           # Feature and bugfix branches must merge to develop
           if [[ "$SOURCE_BRANCH" =~ ^(feature|bugfix)/ ]]; then
             if [[ "$TARGET_BRANCH" != "develop" ]]; then
@@ -25,7 +25,7 @@ jobs:
             fi
             echo "✓ Valid: $SOURCE_BRANCH → develop"
           fi
-          
+
           # Hotfix branches must merge to main or master
           if [[ "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
             if [[ ! "$TARGET_BRANCH" =~ ^(main|master)$ ]]; then
@@ -35,7 +35,7 @@ jobs:
             fi
             echo "✓ Valid: $SOURCE_BRANCH → $TARGET_BRANCH"
           fi
-          
+
           # Release branches can merge to main, master, or develop
           if [[ "$SOURCE_BRANCH" =~ ^release/ ]]; then
             if [[ ! "$TARGET_BRANCH" =~ ^(main|master|develop)$ ]]; then
@@ -45,6 +45,6 @@ jobs:
             fi
             echo "✓ Valid: $SOURCE_BRANCH → $TARGET_BRANCH"
           fi
-          
+
           echo "✓ Merge rules validated successfully"
 

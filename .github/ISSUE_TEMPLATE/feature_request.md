@@ -26,9 +26,9 @@ assignees: ''
 
 <!-- Provide specific use cases where this feature would be helpful -->
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Implementation Ideas
 
