@@ -8,6 +8,12 @@ CURRENT_BRANCH=$(git symbolic-ref --short HEAD)
 
 echo "Checking push to branch: $CURRENT_BRANCH"
 
+# Allow gh-pages branch (used for documentation deployment)
+if [ "$CURRENT_BRANCH" = "gh-pages" ]; then
+    echo "[OK] Allowing push to gh-pages (documentation branch)"
+    exit 0
+fi
+
 # Check if pushing to protected branches
 if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "develop" ]; then
     echo "[ERROR] Direct pushes to '$CURRENT_BRANCH' are not allowed!"
