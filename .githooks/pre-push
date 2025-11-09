@@ -6,6 +6,12 @@
 # Read push information from stdin
 # Format: <local ref> <local sha1> <remote ref> <remote sha1>
 while read local_ref local_sha remote_ref remote_sha; do
+    # Allow tag pushes (refs/tags/*)
+    if echo "$remote_ref" | grep -q "^refs/tags/"; then
+        echo "[OK] Allowing tag push: $remote_ref"
+        exit 0
+    fi
+    
     # Extract remote branch name from ref (refs/heads/branch-name -> branch-name)
     REMOTE_BRANCH=$(echo "$remote_ref" | sed 's#refs/heads/##')
     
