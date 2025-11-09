@@ -1,0 +1,110 @@
+name: Coverage Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  coverage-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests with coverage on PR branch
+        run: |
+          uv run pytest --cov=src/fruityloops_mcp --cov-report=json --cov-report=term
+          cp coverage.json coverage-pr.json
+
+      - name: Get PR branch coverage
+        id: pr-coverage
+        run: |
+          COVERAGE=$(python -c "import json; print(json.load(open('coverage-pr.json'))['totals']['percent_covered'])")
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "PR Branch Coverage: $COVERAGE%"
+
+      - name: Checkout base branch
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }}
+
+      - name: Run tests with coverage on base branch
+        run: |
+          uv run pytest --cov=src/fruityloops_mcp --cov-report=json --cov-report=term
+          cp coverage.json coverage-base.json
+
+      - name: Get base branch coverage
+        id: base-coverage
+        run: |
+          COVERAGE=$(python -c "import json; print(json.load(open('coverage-base.json'))['totals']['percent_covered'])")
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Base Branch Coverage: $COVERAGE%"
+
+      - name: Compare coverage
+        run: |
+          PR_COV=${{ steps.pr-coverage.outputs.coverage }}
+          BASE_COV=${{ steps.base-coverage.outputs.coverage }}
+          
+          echo "Coverage Comparison:"
+          echo "  Base:  $BASE_COV%"
+          echo "  PR:    $PR_COV%"
+          
+          DIFF=$(python -c "print($PR_COV - $BASE_COV)")
+          echo "  Diff:  $DIFF%"
+          
+          if (( $(echo "$DIFF < 0" | bc -l) )); then
+            echo "❌ Coverage decreased by ${DIFF#-}%"
+            echo ""
+            echo "Please add tests to maintain or improve coverage."
+            exit 1
+          else
+            echo "✅ Coverage maintained or improved"
+          fi
+
+      - name: Post coverage report as comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prCov = '${{ steps.pr-coverage.outputs.coverage }}';
+            const baseCov = '${{ steps.base-coverage.outputs.coverage }}';
+            const diff = (parseFloat(prCov) - parseFloat(baseCov)).toFixed(2);
+            const icon = diff >= 0 ? '✅' : '❌';
+            
+            const comment = `## ${icon} Coverage Report
+            
+            | Branch | Coverage |
+            |--------|----------|
+            | Base (\`${{ github.base_ref }}\`) | ${baseCov}% |
+            | PR (\`${{ github.head_ref }}\`) | ${prCov}% |
+            | **Difference** | **${diff}%** |
+            
+            ${diff < 0 ? '⚠️ **Coverage decreased!** Please add tests to cover new code.' : '✨ Coverage maintained or improved!'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Upload HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+

@@ -1,0 +1,50 @@
+name: Merge Enforcement
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  enforce-git-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate merge rules
+        run: |
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          TARGET_BRANCH="${{ github.base_ref }}"
+          
+          echo "Source: $SOURCE_BRANCH"
+          echo "Target: $TARGET_BRANCH"
+          
+          # Feature and bugfix branches must merge to develop
+          if [[ "$SOURCE_BRANCH" =~ ^(feature|bugfix)/ ]]; then
+            if [[ "$TARGET_BRANCH" != "develop" ]]; then
+              echo "✗ Error: $SOURCE_BRANCH can only merge to develop"
+              echo "Current target: $TARGET_BRANCH"
+              exit 1
+            fi
+            echo "✓ Valid: $SOURCE_BRANCH → develop"
+          fi
+          
+          # Hotfix branches must merge to main or master
+          if [[ "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
+            if [[ ! "$TARGET_BRANCH" =~ ^(main|master)$ ]]; then
+              echo "✗ Error: hotfix branches can only merge to main or master"
+              echo "Current target: $TARGET_BRANCH"
+              exit 1
+            fi
+            echo "✓ Valid: $SOURCE_BRANCH → $TARGET_BRANCH"
+          fi
+          
+          # Release branches can merge to main, master, or develop
+          if [[ "$SOURCE_BRANCH" =~ ^release/ ]]; then
+            if [[ ! "$TARGET_BRANCH" =~ ^(main|master|develop)$ ]]; then
+              echo "✗ Error: release branches can only merge to main, master, or develop"
+              echo "Current target: $TARGET_BRANCH"
+              exit 1
+            fi
+            echo "✓ Valid: $SOURCE_BRANCH → $TARGET_BRANCH"
+          fi
+          
+          echo "✓ Merge rules validated successfully"
+
