@@ -20,6 +20,8 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.whl
+*.tar.gz
 MANIFEST
 
 # Virtual environments
@@ -44,6 +46,7 @@ htmlcov/
 .tox/
 .nox/
 coverage.xml
+coverage.json
 *.cover
 .hypothesis/
 
@@ -68,5 +71,5 @@ Desktop.ini
 *.log
 
 # UV
-uv.lock
+# Note: uv.lock is tracked for reproducible builds
 
