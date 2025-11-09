@@ -3,16 +3,23 @@
 # Pre-push hook to enforce git-flow branching and prevent direct pushes to protected branches
 #
 
-# Get current branch
+# Read push information from stdin
+# Format: <local ref> <local sha1> <remote ref> <remote sha1>
+while read local_ref local_sha remote_ref remote_sha; do
+    # Extract remote branch name from ref (refs/heads/branch-name -> branch-name)
+    REMOTE_BRANCH=$(echo "$remote_ref" | sed 's#refs/heads/##')
+    
+    # Allow gh-pages branch (used for documentation deployment)
+    if [ "$REMOTE_BRANCH" = "gh-pages" ]; then
+        echo "[OK] Allowing push to gh-pages (documentation branch)"
+        exit 0
+    fi
+done
+
+# Get current branch for other checks
 CURRENT_BRANCH=$(git symbolic-ref --short HEAD)
 
 echo "Checking push to branch: $CURRENT_BRANCH"
-
-# Allow gh-pages branch (used for documentation deployment)
-if [ "$CURRENT_BRANCH" = "gh-pages" ]; then
-    echo "[OK] Allowing push to gh-pages (documentation branch)"
-    exit 0
-fi
 
 # Check if pushing to protected branches
 if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "develop" ]; then
