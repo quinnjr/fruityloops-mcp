@@ -1,0 +1,363 @@
+# FL Studio MCP Server - Project Conventions
+
+## Project Overview
+
+FL Studio MCP Server is a Model Context Protocol server that enables AI assistants to interact with FL Studio through its Python API and MIDI interfaces.
+
+## Key Technologies
+
+- **Python 3.10+**: Primary language
+- **uv**: Package manager and tool runner
+- **mcp**: Model Context Protocol library
+- **mido**: MIDI library
+- **pytest**: Testing framework
+- **ruff**: Linting and formatting
+- **mkdocs**: Documentation generator
+
+## Project Structure
+
+```
+fruityloops-mcp/
+├── src/fruityloops_mcp/    # Source code
+│   ├── server.py           # MCP server implementation
+│   ├── midi_interface.py   # MIDI interface
+│   ├── __init__.py         # Package init
+│   └── __main__.py         # Entry point
+├── tests/                  # Test suite
+├── docs/                   # Documentation source
+├── .github/                # GitHub configuration
+│   ├── workflows/          # CI/CD workflows
+│   └── ISSUE_TEMPLATE/     # Issue templates
+├── .githooks/              # Git hooks
+├── .cursor/rules/          # Cursor AI rules
+├── pyproject.toml          # Project configuration
+├── README.md               # Project README
+├── LICENSE                 # MIT License
+└── CONTRIBUTING.md         # Contributing guide
+```
+
+## Module Organization
+
+### src/fruityloops_mcp/server.py
+
+- `FLStudioMCPServer`: Main server class
+- `StubModule`: Stub for when FL Studio API unavailable
+- FL Studio API tool implementations
+- MIDI tool implementations
+
+### src/fruityloops_mcp/midi_interface.py
+
+- `MIDIInterface`: MIDI communication class
+- Methods for sending MIDI messages
+- Connection management
+- Error handling
+
+## Naming Conventions
+
+### Python
+
+```python
+# Classes: PascalCase
+class FLStudioMCPServer:
+    pass
+
+class MIDIInterface:
+    pass
+
+# Functions/methods: snake_case
+def send_midi_note(note: int, velocity: int) -> bool:
+    pass
+
+# Constants: UPPER_SNAKE_CASE
+FL_STUDIO_AVAILABLE = True
+DEFAULT_MIDI_PORT = "FLStudio_MIDI"
+
+# Private members: leading underscore
+def _internal_method(self):
+    pass
+
+self._private_var = value
+```
+
+### Files
+
+- Python modules: `snake_case.py`
+- Test files: `test_*.py`
+- Documentation: `kebab-case.md`
+
+### Git Branches
+
+- Features: `feature/descriptive-name`
+- Bugfixes: `bugfix/issue-description`
+- Hotfixes: `hotfix/critical-fix`
+- Releases: `release/v1.1.0`
+
+## Tool Naming in MCP Server
+
+MCP tools use snake_case with prefixes:
+
+```python
+# Transport tools
+"transport_start"
+"transport_stop"
+"transport_get_song_pos"
+
+# MIDI tools
+"midi_connect"
+"midi_send_note"
+"midi_send_cc"
+
+# Mixer tools
+"mixer_get_track_volume"
+"mixer_set_track_name"
+```
+
+## Error Handling Patterns
+
+### Return False on Failure
+
+For MIDI and API methods:
+
+```python
+def send_note(self, note: int) -> bool:
+    """Send MIDI note.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    if not self._is_connected:
+        logger.warning("Not connected")
+        return False
+    
+    try:
+        self._port.send(message)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send: {e}")
+        return False
+```
+
+### Log Errors
+
+Always log errors with context:
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+try:
+    risky_operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    raise
+```
+
+## Async Patterns
+
+### MCP Server Methods
+
+Server methods should be async:
+
+```python
+async def run(self) -> None:
+    """Run the MCP server."""
+    async with stdio_server(self.server) as (read_stream, write_stream):
+        await asyncio.Future()  # Run indefinitely
+```
+
+### Tool Handlers
+
+Tool handlers that need async operations:
+
+```python
+async def _midi_send_note_handler(self, args: dict[str, Any]) -> str:
+    """Handler for midi_send_note tool."""
+    note = args["note"]
+    duration = args.get("duration", 0.5)
+    
+    if self.midi.send_note_on(note):
+        await asyncio.sleep(duration)
+        if self.midi.send_note_off(note):
+            return f"Sent MIDI note {note}"
+    return f"Failed to send note {note}"
+```
+
+## Configuration Patterns
+
+### Environment Variables
+
+Use environment variables for configuration:
+
+```python
+import os
+
+MIDI_PORT = os.getenv("MIDI_PORT", "FLStudio_MIDI")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+```
+
+### Default Values
+
+Provide sensible defaults:
+
+```python
+def __init__(
+    self, 
+    midi_port: str = "FLStudio_MIDI",
+    timeout: int = 5
+):
+    """Initialize with defaults."""
+    self.midi_port = midi_port
+    self.timeout = timeout
+```
+
+## FL Studio API Handling
+
+### Graceful Degradation
+
+Handle FL Studio API absence:
+
+```python
+try:
+    import channels
+    import mixer
+    FL_STUDIO_AVAILABLE = True
+except ImportError:
+    FL_STUDIO_AVAILABLE = False
+    # Create stubs
+    channels = StubModule("channels")
+    mixer = StubModule("mixer")
+```
+
+### Check Availability
+
+Always check before using FL Studio API:
+
+```python
+if not FL_STUDIO_AVAILABLE:
+    return "FL Studio API not available"
+
+# Safe to use FL Studio API here
+result = transport.start()
+```
+
+## MIDI Best Practices
+
+### Connection Management
+
+Use context manager when possible:
+
+```python
+with MIDIInterface() as midi:
+    midi.send_note_on(60)
+    # Automatically disconnects
+```
+
+### Error Recovery
+
+Handle disconnections gracefully:
+
+```python
+def _send_message(self, msg: mido.Message) -> bool:
+    if not self._is_connected:
+        logger.warning("Not connected, attempting reconnect")
+        if not self.connect():
+            return False
+    
+    try:
+        self._output_port.send(msg)
+        return True
+    except Exception as e:
+        logger.error(f"Send failed: {e}")
+        self._is_connected = False
+        return False
+```
+
+## Testing Patterns
+
+### Mock External Dependencies
+
+```python
+@patch("fruityloops_mcp.server.transport")
+def test_transport_start(mock_transport):
+    """Test transport start."""
+    server = FLStudioMCPServer()
+    result = server._execute_tool("transport_start", {})
+    mock_transport.start.assert_called_once()
+```
+
+### Test Both Success and Failure
+
+```python
+def test_send_note_success(self):
+    """Test successful note send."""
+    midi = MIDIInterface()
+    midi.connect()
+    assert midi.send_note_on(60) is True
+
+def test_send_note_failure(self):
+    """Test failed note send."""
+    midi = MIDIInterface()  # Not connected
+    assert midi.send_note_on(60) is False
+```
+
+## Version Management
+
+### Version Numbers
+
+Use Semantic Versioning (semver):
+
+- **Major**: Breaking changes (1.0.0 → 2.0.0)
+- **Minor**: New features (1.0.0 → 1.1.0)
+- **Patch**: Bug fixes (1.0.0 → 1.0.1)
+
+### Version Locations
+
+Update version in both places:
+
+1. `pyproject.toml`: `version = "1.1.0"`
+2. `src/fruityloops_mcp/__init__.py`: `__version__ = "1.1.0"`
+
+## CI/CD Pipeline
+
+### Workflows
+
+- **CI**: Run on all PRs (test, lint, type-check)
+- **Release**: Run on version tags (build, publish)
+- **Docs**: Run on main branch pushes (deploy docs)
+- **Coverage**: Run on PRs (check coverage)
+
+### Required Checks
+
+All PRs must pass:
+- ✅ All tests
+- ✅ 90% code coverage
+- ✅ Ruff linting
+- ✅ Ruff formatting
+- ✅ No type errors
+
+## Release Process
+
+Follow git-flow for releases:
+
+1. Create `release/vX.Y.Z` from `develop`
+2. Update versions and changelog
+3. PR to `main`
+4. Tag after merge: `git tag -a vX.Y.Z`
+5. Push tag: `git push origin vX.Y.Z`
+6. Merge back to `develop`
+
+See `docs/release-process.md` for full details.
+
+## License
+
+This project is licensed under the MIT License.
+Copyright holder: Joseph Quinn
+
+Always maintain copyright notice in LICENSE file.
+
+## No Helper Scripts
+
+**Do not create helper scripts or workarounds** unless explicitly requested.
+
+Use standard tools and workflows. If a process seems too complex, improve the tooling, don't create workarounds.

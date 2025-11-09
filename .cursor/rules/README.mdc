@@ -1,0 +1,124 @@
+# Cursor Rules for FL Studio MCP Server
+
+This directory contains Cursor AI rules that define coding standards, workflows, and conventions for the FL Studio MCP Server project.
+
+## Overview
+
+These rules help maintain consistency and quality across the codebase by providing clear guidelines for:
+
+- Git workflow and branching strategy
+- Python coding standards
+- Testing requirements
+- Documentation practices
+- Project-specific conventions
+
+## Rule Files
+
+### git-workflow.mdc
+
+**Critical git workflow rules, including:**
+- ⛔ **Never use `--no-verify`** (most important rule)
+- Git-flow branching model
+- Commit message format (Conventional Commits)
+- Pull request workflow
+- Tag and release management
+
+### python-testing.mdc
+
+**Python development and testing standards:**
+- Testing requirements (90% coverage minimum)
+- Using `uv` as package manager
+- Code quality with Ruff
+- Type hints and docstrings
+- Async/await patterns
+- Error handling
+
+### documentation.mdc
+
+**Documentation guidelines:**
+- MkDocs usage and structure
+- Writing clear documentation
+- API documentation generation
+- Code examples in docs
+- Changelog management
+
+### project-conventions.mdc
+
+**Project-specific conventions:**
+- Module organization
+- Naming conventions
+- FL Studio API handling
+- MIDI best practices
+- Testing patterns
+- Release process
+
+## Using These Rules
+
+Cursor AI will automatically reference these rules when:
+- Writing new code
+- Suggesting changes
+- Reviewing code
+- Answering questions about the project
+
+The rules help ensure that all AI-generated code and suggestions follow project standards.
+
+## Critical Rules
+
+### 🚨 Most Important Rules
+
+1. **Never use `--no-verify` with git commands**
+   - Git hooks exist for quality control
+   - Bypassing them defeats their purpose
+   - Fix issues instead of bypassing checks
+
+2. **Always include unit tests**
+   - Minimum 90% coverage
+   - Tests must pass before committing
+
+3. **Always use `uv` instead of pip/npm**
+   - Project standard package manager
+
+4. **Follow git-flow branching**
+   - No direct pushes to main/develop
+   - Use feature/bugfix/hotfix branches
+
+5. **Use Conventional Commits**
+   - Required commit message format
+   - Enforced by git hooks
+
+## Updating Rules
+
+To update or add rules:
+
+1. Edit existing `.mdc` files or create new ones
+2. Use `.mdc` extension (not `.md`)
+3. Keep rules clear and actionable
+4. Include examples
+5. Commit changes to version control
+
+## Rule Format
+
+Rules should:
+- Be specific and actionable
+- Include code examples
+- Explain why, not just what
+- Use clear headings and organization
+- Distinguish between requirements (✅) and anti-patterns (❌)
+
+## Questions?
+
+If you're unsure about any rule or convention:
+1. Check the relevant rule file
+2. Look at existing code for examples
+3. Refer to full documentation in `docs/`
+4. Ask in project discussions
+
+## Enforcement
+
+These rules are enforced through:
+- Git hooks (pre-commit, pre-push, commit-msg)
+- CI/CD workflows
+- Code review process
+- Cursor AI assistance
+
+**Do not bypass enforcement mechanisms!**

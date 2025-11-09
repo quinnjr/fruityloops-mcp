@@ -1,0 +1,276 @@
+# Documentation Rules
+
+## Documentation Requirements
+
+**All features must be documented.**
+
+Documentation is as important as code. Users should be able to understand and use features without reading the source code.
+
+## Documentation Structure
+
+```
+docs/
+├── index.md                    # Home page
+├── installation.md             # Installation guide
+├── quick-start.md              # Quick start
+├── usage.md                    # Usage examples
+├── fl-studio-integration.md    # FL Studio integration
+├── midi-integration.md         # MIDI integration
+├── mcp-client-setup.md         # MCP client setup
+├── configuration.md            # Configuration
+├── contributing.md             # Contributing guide
+├── development.md              # Development setup
+├── testing.md                  # Testing guide
+├── git-workflow.md             # Git workflow
+├── release-process.md          # Release process
+├── api/
+│   ├── server.md              # Server API reference
+│   └── midi.md                # MIDI API reference
+└── stylesheets/
+    └── extra.css              # Custom styles
+```
+
+## Documentation Tools
+
+**MkDocs with Material theme:**
+
+```bash
+# Install docs dependencies
+uv sync --extra docs
+
+# Serve locally
+uv run mkdocs serve
+# Visit http://localhost:8000
+
+# Build documentation
+uv run mkdocs build
+
+# Deploy to GitHub Pages
+uv run mkdocs gh-deploy --force
+```
+
+## Writing Documentation
+
+### Use Clear Language
+
+- Write for users, not developers
+- Use simple, direct language
+- Include examples
+- Add code snippets where helpful
+
+### Code Examples
+
+Always include working code examples:
+
+````markdown
+## Sending a MIDI Note
+
+```python
+from fruityloops_mcp.midi_interface import MIDIInterface
+
+# Create interface
+midi = MIDIInterface()
+
+# Connect
+midi.connect()
+
+# Send middle C
+midi.send_note_on(60, 100)
+
+# Disconnect
+midi.disconnect()
+```
+````
+
+### API Documentation
+
+Use Google-style docstrings - they're auto-generated into docs:
+
+```python
+def my_function(param: str, count: int = 10) -> list[str]:
+    """Process the parameter and return results.
+    
+    This function takes a string parameter and processes it
+    based on the count value provided.
+    
+    Args:
+        param: The input string to process
+        count: Number of items to return, default 10
+    
+    Returns:
+        List of processed strings
+    
+    Raises:
+        ValueError: If param is empty
+    
+    Example:
+        >>> my_function("test", 5)
+        ['test_0', 'test_1', 'test_2', 'test_3', 'test_4']
+    """
+    # Implementation
+```
+
+## Documentation for New Features
+
+When adding a new feature:
+
+1. ✅ **Update usage.md** with examples
+2. ✅ **Add API documentation** via docstrings
+3. ✅ **Update README.md** if it's a major feature
+4. ✅ **Add to CHANGELOG.md** in Unreleased section
+5. ✅ **Create integration guide** if needed
+
+## README Requirements
+
+The README should include:
+
+- Project description
+- Key features
+- Quick installation
+- Basic usage example
+- Link to full documentation
+- Contributing guidelines
+- License information
+
+## Changelog
+
+Follow Keep a Changelog format:
+
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Changed
+- Changes to existing features
+
+### Fixed
+- Bug fixes
+
+### Removed
+- Removed features
+
+## [1.1.0] - 2024-XX-XX
+
+### Added
+- Feature 1
+- Feature 2
+```
+
+## Documentation Testing
+
+Before committing documentation:
+
+1. ✅ Build docs locally: `uv run mkdocs build`
+2. ✅ Check for broken links
+3. ✅ Verify code examples work
+4. ✅ Check spelling and grammar
+5. ✅ Preview in browser
+
+## API Reference
+
+API documentation is auto-generated from docstrings using mkdocstrings:
+
+```markdown
+# In docs/api/server.md
+
+## FLStudioMCPServer
+
+::: fruityloops_mcp.server.FLStudioMCPServer
+    options:
+      show_source: true
+      heading_level: 3
+```
+
+## Documentation Style Guide
+
+### Headings
+
+Use proper heading hierarchy:
+
+```markdown
+# H1 - Page Title (once per page)
+
+## H2 - Major Section
+
+### H3 - Subsection
+
+#### H4 - Minor Section
+```
+
+### Links
+
+Use descriptive link text:
+
+```markdown
+# ✅ Good
+See the [installation guide](installation.md) for details.
+
+# ❌ Bad
+Click [here](installation.md) for installation.
+```
+
+### Code Blocks
+
+Always specify the language:
+
+```markdown
+# ✅ Good
+```python
+def example():
+    return True
+```
+
+# ❌ Bad
+```
+def example():
+    return True
+```
+```
+
+### Admonitions
+
+Use MkDocs admonitions for important info:
+
+```markdown
+!!! note
+    This is a note with additional information.
+
+!!! warning
+    This is a warning about potential issues.
+
+!!! danger
+    This is a critical warning.
+
+!!! tip
+    This is a helpful tip.
+```
+
+## Don't Create Documentation Files Unless Asked
+
+**Do not proactively create:**
+- `*.md` files
+- README files
+- Documentation files
+
+Only create documentation when:
+- Explicitly requested by user
+- Required for a new feature
+- Part of a PR that adds functionality
+
+## Documentation Deployment
+
+Documentation auto-deploys to GitHub Pages:
+
+- **URL**: https://quinnjr.github.io/fruityloops-mcp/
+- **Trigger**: Push to `main` branch
+- **Workflow**: `.github/workflows/docs.yml`
+
+Manual deployment:
+
+```bash
+uv run mkdocs gh-deploy --force
+```
+
+This builds docs and pushes to `gh-pages` branch.
