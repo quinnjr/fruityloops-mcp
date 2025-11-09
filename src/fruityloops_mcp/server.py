@@ -14,6 +14,21 @@ from fruityloops_mcp.midi_interface import MIDIInterface
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# Create stub module class for when FL Studio API is not available
+class StubModule:
+    """A stub module that returns itself for any attribute access or call."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def __getattr__(self, item: str) -> "StubModule":
+        return self
+
+    def __call__(self, *_args: Any, **_kwargs: Any) -> "StubModule":
+        return self
+
+
 # Import FL Studio API modules (these will only work when FL Studio is running)
 try:
     import channels
@@ -30,16 +45,6 @@ except ImportError:
     FL_STUDIO_AVAILABLE = False
 
     # Create stub modules that return themselves for any attribute access
-    class StubModule:
-        def __init__(self, name: str):
-            self._name = name
-
-        def __getattr__(self, item: str) -> "StubModule":
-            return self
-
-        def __call__(self, *_args: Any, **_kwargs: Any) -> "StubModule":
-            return self
-
     transport = StubModule("transport")
     mixer = StubModule("mixer")
     channels = StubModule("channels")
