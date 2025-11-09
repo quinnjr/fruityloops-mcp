@@ -1,0 +1,237 @@
+# Python and Testing Rules
+
+## Testing Requirements
+
+### Unit Tests are Mandatory
+
+**All new code must include unit tests.**
+
+- Minimum 90% code coverage
+- Tests must pass before committing
+- Use Vitest for TypeScript/JavaScript, pytest for Python
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=src/fruityloops_mcp --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_server.py
+
+# Run specific test
+uv run pytest tests/test_server.py::TestFLStudioMCPServer::test_initialization
+```
+
+### Writing Tests
+
+Follow pytest conventions:
+
+```python
+# File: tests/test_feature.py
+import pytest
+from fruityloops_mcp.module import Feature
+
+class TestFeature:
+    """Test suite for Feature class."""
+    
+    def test_basic_functionality(self):
+        """Test basic functionality."""
+        feature = Feature()
+        result = feature.do_something()
+        assert result is not None
+    
+    @pytest.mark.asyncio
+    async def test_async_functionality(self):
+        """Test async functionality."""
+        feature = Feature()
+        result = await feature.do_async()
+        assert result == expected_value
+```
+
+### Test Organization
+
+```
+tests/
+├── __init__.py
+├── test_server.py          # Server tests
+├── test_midi.py            # MIDI interface tests
+├── test_integration.py     # Integration tests
+├── test_edge_cases.py      # Edge case tests
+└── conftest.py             # Shared fixtures
+```
+
+## Python Code Standards
+
+### Package Manager
+
+**Always use `uv` instead of `npm`, `pip`, or `ts-node`.**
+
+```bash
+# ✅ Correct
+uv run pytest
+uv run python script.py
+uv add package-name
+uv sync
+
+# ❌ Wrong
+pip install package-name
+python script.py
+npm install
+```
+
+### Code Quality Tools
+
+**Ruff for linting and formatting:**
+
+```bash
+# Check code
+uv run ruff check .
+
+# Fix issues automatically
+uv run ruff check --fix .
+
+# Format code
+uv run ruff format .
+
+# Check formatting without changes
+uv run ruff format --check .
+```
+
+### Type Hints
+
+Always use type hints:
+
+```python
+# ✅ Good
+def process_data(items: list[str], count: int = 10) -> dict[str, Any]:
+    """Process data items."""
+    return {"items": items[:count]}
+
+# ❌ Bad
+def process_data(items, count=10):
+    return {"items": items[:count]}
+```
+
+### Docstrings
+
+Use Google-style docstrings:
+
+```python
+def send_midi_note(note: int, velocity: int = 64, channel: int = 0) -> bool:
+    """Send a MIDI note on message.
+    
+    Args:
+        note: MIDI note number (0-127)
+        velocity: Note velocity (0-127), default 64
+        channel: MIDI channel (0-15), default 0
+    
+    Returns:
+        True if message sent successfully, False otherwise
+    
+    Raises:
+        ValueError: If note is out of range
+    
+    Example:
+        >>> midi = MIDIInterface()
+        >>> midi.connect()
+        >>> midi.send_midi_note(60, 100, 0)
+        True
+    """
+    # Implementation
+```
+
+## Async/Await
+
+Use proper async patterns:
+
+```python
+# ✅ Good
+@pytest.mark.asyncio
+async def test_async_function():
+    result = await async_function()
+    assert result is not None
+
+# ❌ Bad - don't mix sync/async improperly
+def test_async_function():
+    result = async_function()  # Missing await
+    assert result is not None
+```
+
+## Error Handling
+
+Handle errors gracefully:
+
+```python
+# ✅ Good
+try:
+    result = risky_operation()
+except SpecificException as e:
+    logger.error(f"Operation failed: {e}")
+    return False
+except Exception as e:
+    logger.error(f"Unexpected error: {e}")
+    raise
+
+# ❌ Bad
+try:
+    result = risky_operation()
+except:  # Bare except
+    pass  # Silent failure
+```
+
+## Dependencies
+
+### Adding Dependencies
+
+```bash
+# Runtime dependency
+uv add package-name
+
+# Development dependency
+uv add --dev package-name
+
+# Documentation dependency
+uv add --group docs package-name
+```
+
+### Dependency Requirements
+
+- Pin major versions in `pyproject.toml`
+- Keep dependencies minimal
+- Document why each dependency is needed
+- Regularly update dependencies
+
+## Testing Coverage Requirements
+
+- **Overall**: 90% minimum
+- **New code**: 100% coverage required
+- **Critical paths**: Must have tests (MIDI, API calls)
+- **Edge cases**: Test boundary conditions
+- **Error paths**: Test error handling
+
+### Coverage Check
+
+```bash
+# Generate coverage report
+uv run pytest --cov=src/fruityloops_mcp --cov-report=html
+
+# View report
+open htmlcov/index.html
+```
+
+## Pre-commit Checklist
+
+Before committing:
+
+1. ✅ Tests pass: `uv run pytest`
+2. ✅ Linting passes: `uv run ruff check .`
+3. ✅ Formatting correct: `uv run ruff format --check .`
+4. ✅ Type hints added
+5. ✅ Docstrings written
+6. ✅ Coverage maintained/improved
+
+**The git hooks will verify these automatically - don't bypass them!**

@@ -1,0 +1,143 @@
+# Git Workflow Rules
+
+## Critical: Never Bypass Git Hooks
+
+**NEVER use `--no-verify` flag in any git commands.**
+
+Git hooks are in place to ensure code quality and workflow compliance. Bypassing them defeats their purpose and can lead to:
+- Broken builds on CI/CD
+- Code quality issues
+- Non-compliant commit messages
+- Protected branch violations
+
+### ❌ FORBIDDEN Commands
+
+```bash
+# NEVER DO THIS:
+git commit --no-verify
+git push --no-verify
+git commit -n
+git push -n
+```
+
+### ✅ Correct Approach
+
+If a git hook fails:
+1. **Read the error message** - it tells you what's wrong
+2. **Fix the issue** - address the linting, formatting, or validation error
+3. **Commit normally** - let the hooks validate your changes
+
+```bash
+# If pre-commit fails:
+uv run ruff check --fix .
+uv run ruff format .
+git add .
+git commit -m "fix: your message"
+
+# If tests fail:
+uv run pytest
+# Fix failing tests, then commit
+
+# If commit message format is wrong:
+# Use conventional commits format
+git commit -m "feat: add new feature"
+```
+
+## Git-Flow Branching
+
+### Branch Types
+
+- `main` - Production code (protected)
+- `develop` - Development integration (protected)
+- `feature/*` - New features
+- `bugfix/*` - Bug fixes
+- `hotfix/*` - Production fixes
+- `release/*` - Release preparation
+- `gh-pages` - Documentation (auto-managed)
+
+### Branch Creation
+
+```bash
+# Feature
+git checkout develop
+git checkout -b feature/descriptive-name
+
+# Bugfix
+git checkout develop
+git checkout -b bugfix/issue-description
+
+# Hotfix
+git checkout main
+git checkout -b hotfix/critical-fix
+
+# Release
+git checkout develop
+git checkout -b release/v1.1.0
+```
+
+### Protected Branches
+
+**Never push directly to:**
+- `main`
+- `develop`
+
+Always use Pull Requests for these branches.
+
+## Commit Message Format
+
+Follow Conventional Commits specification:
+
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+### Valid Types
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `style`: Formatting (no code change)
+- `refactor`: Code restructuring
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks
+- `perf`: Performance improvement
+- `ci`: CI/CD changes
+- `build`: Build system changes
+
+### Examples
+
+```bash
+git commit -m "feat: add MIDI pitch bend support"
+git commit -m "fix(server): resolve connection timeout issue"
+git commit -m "docs: update installation guide"
+git commit -m "test: add edge case tests for MIDI interface"
+git commit -m "chore: bump version to 1.1.0"
+```
+
+## Pull Request Workflow
+
+1. Create feature/bugfix branch
+2. Make changes and commit
+3. Push branch: `git push origin feature/my-feature`
+4. Create Pull Request on GitHub
+5. Wait for CI checks to pass
+6. Get review/approval
+7. Merge (squash or merge commit, never rebase for PRs to main/develop)
+
+## Tag Management
+
+Tags are for releases only:
+
+```bash
+# Create annotated tag
+git tag -a v1.1.0 -m "Release v1.1.0"
+
+# Push tag (triggers release workflow)
+git push origin v1.1.0
+```
+
+Never tag arbitrary commits - only tag releases from `main` branch.
