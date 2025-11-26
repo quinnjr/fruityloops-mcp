@@ -13,8 +13,8 @@ Setup Requirements:
 """
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
 
 logger = logging.getLogger(__name__)
 
