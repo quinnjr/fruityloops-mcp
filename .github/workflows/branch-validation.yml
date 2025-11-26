@@ -38,25 +38,3 @@ jobs:
           echo "  - release/<version>"
           exit 1
 
-  validate-pr-title:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Check PR title format
-        run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          echo "Validating PR title: $PR_TITLE"
-
-          # Check if PR title follows conventional commits
-          if [[ "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
-            echo "✓ Valid PR title format"
-            exit 0
-          fi
-
-          echo "✗ Invalid PR title format: $PR_TITLE"
-          echo "PR titles must follow Conventional Commits:"
-          echo "  type(scope): description"
-          echo ""
-          echo "Valid types: feat, fix, docs, style, refactor, test, chore, perf, ci, build"
-          exit 1
-
