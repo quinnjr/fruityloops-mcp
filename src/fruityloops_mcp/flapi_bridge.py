@@ -619,4 +619,3 @@ def get_bridge() -> FLStudioBridge:
     if _bridge is None:
         _bridge = FLStudioBridge()
     return _bridge
-
