@@ -70,18 +70,3 @@ jobs:
             echo "✓ PR has labels applied"
           fi
 
-  pr-linked-issues:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check for linked issues
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-
-          # Check for common issue reference patterns
-          if echo "$PR_BODY" | grep -qiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)\ #[0-9]+'; then
-            echo "✓ PR references an issue"
-          else
-            echo "ℹ️  No linked issue found"
-            echo "Consider linking related issues using 'Fixes #123' or 'Closes #456'"
-          fi
-

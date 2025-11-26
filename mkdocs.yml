@@ -81,6 +81,7 @@ nav:
       - Git Workflow: git-workflow.md
   - API Reference:
       - Server: api/server.md
+      - Flapi Bridge: api/flapi_bridge.md
       - MIDI Interface: api/midi.md
   - About:
       - License: license.md

@@ -1,7 +1,7 @@
 """Additional tests to boost code coverage to 90%+."""
 
 import contextlib
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -126,12 +126,21 @@ class TestMIDICoverageBoost:
         assert ports["output"] == ["Output1", "Output2"]
 
 
+@pytest.fixture
+def mock_flapi_bridge():
+    """Mock the Flapi bridge for testing."""
+    with patch("fruityloops_mcp.server.get_bridge") as mock_get_bridge:
+        mock_bridge = MagicMock()
+        mock_get_bridge.return_value = mock_bridge
+        yield mock_bridge
+
+
 class TestServerCoverageBoost:
     """Tests to cover server tool execution paths."""
 
     @pytest.mark.asyncio
     @patch("fruityloops_mcp.server.MIDIInterface")
-    async def test_execute_all_midi_tools(self, mock_midi_class):
+    async def test_execute_all_midi_tools(self, mock_midi_class, mock_flapi_bridge):
         """Test executing all MIDI tools to increase coverage."""
         mock_midi = mock_midi_class.return_value
         mock_midi.list_ports.return_value = {"input": ["test"], "output": ["test"]}
@@ -154,9 +163,8 @@ class TestServerCoverageBoost:
         await server._execute_tool("midi_send_pitch_bend", {"pitch": 1000})
 
     @pytest.mark.asyncio
-    @patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True)
     @patch("fruityloops_mcp.server.MIDIInterface")
-    async def test_execute_failed_midi_operations(self, mock_midi_class):
+    async def test_execute_failed_midi_operations(self, mock_midi_class, mock_flapi_bridge):
         """Test MIDI operations that fail."""
         mock_midi = mock_midi_class.return_value
         mock_midi.connect.return_value = False
@@ -194,7 +202,7 @@ class TestServerMIDINoteHandler:
     @pytest.mark.asyncio
     @patch("fruityloops_mcp.server.MIDIInterface")
     @patch("fruityloops_mcp.server.asyncio.sleep")
-    async def test_midi_send_note_success(self, mock_sleep, mock_midi_class):
+    async def test_midi_send_note_success(self, mock_sleep, mock_midi_class, mock_flapi_bridge):
         """Test successful MIDI note send with duration."""
         mock_midi = mock_midi_class.return_value
         mock_midi.send_note_on.return_value = True
@@ -211,52 +219,33 @@ class TestServerMIDINoteHandler:
         mock_midi.send_note_off.assert_called_once_with(60, 100, 1)
 
 
-class TestStubModule:
-    """Test the StubModule class for FL Studio API fallback."""
+class TestFlapiBridge:
+    """Test the Flapi bridge module."""
 
-    def test_stub_module_creation(self):
-        """Test creating a StubModule."""
-        from fruityloops_mcp.server import StubModule
+    def test_flapi_bridge_creation(self):
+        """Test creating a FLStudioBridge."""
+        from fruityloops_mcp.flapi_bridge import FLStudioBridge
 
-        stub = StubModule("test_module")
-        assert stub._name == "test_module"
+        bridge = FLStudioBridge()
+        assert bridge is not None
+        assert not bridge.is_enabled
 
-    def test_stub_module_getattr_chain(self):
-        """Test that StubModule returns itself for attribute access chains."""
-        from fruityloops_mcp.server import StubModule
+    def test_flapi_bridge_properties(self):
+        """Test FLStudioBridge properties."""
+        from fruityloops_mcp.flapi_bridge import FLStudioBridge
 
-        stub = StubModule("test")
-        # Chain attribute access
-        result = stub.some.nested.attribute.chain
-        assert isinstance(result, StubModule)
+        bridge = FLStudioBridge()
+        # Check initial state
+        assert bridge.is_enabled is False
+        assert bridge.is_connected is False
 
-    def test_stub_module_call_returns_self(self):
-        """Test that calling StubModule returns itself."""
-        from fruityloops_mcp.server import StubModule
+    def test_get_bridge_singleton(self):
+        """Test get_bridge returns same instance."""
+        from fruityloops_mcp.flapi_bridge import get_bridge
 
-        stub = StubModule("test")
-        result = stub()
-        assert result is stub
-
-    def test_stub_module_call_with_args(self):
-        """Test calling StubModule with arguments."""
-        from fruityloops_mcp.server import StubModule
-
-        stub = StubModule("test")
-        result = stub(arg1="value", arg2=42)
-        assert isinstance(result, StubModule)
-
-    def test_stub_module_complex_chain(self):
-        """Test complex chain of attributes and calls."""
-        from fruityloops_mcp.server import StubModule
-
-        stub = StubModule("fl_api")
-        # Simulate FL Studio API usage pattern
-        result = stub.transport.start()
-        assert isinstance(result, StubModule)
-
-        result2 = stub.mixer.getTrackVolume(0)
-        assert isinstance(result2, StubModule)
+        bridge1 = get_bridge()
+        bridge2 = get_bridge()
+        assert bridge1 is bridge2
 
 
 class TestServerRunMethod:
@@ -264,10 +253,8 @@ class TestServerRunMethod:
 
     @pytest.mark.asyncio
     @patch("fruityloops_mcp.server.stdio_server")
-    async def test_run_method_success(self, mock_stdio):
+    async def test_run_method_success(self, mock_stdio, mock_flapi_bridge):
         """Test successful run of the server."""
-        from fruityloops_mcp.server import FLStudioMCPServer
-
         mock_read = Mock()
         mock_write = Mock()
         mock_stdio.return_value.__aenter__.return_value = (mock_read, mock_write)
@@ -283,10 +270,8 @@ class TestServerRunMethod:
 
     @pytest.mark.asyncio
     @patch("fruityloops_mcp.server.stdio_server")
-    async def test_run_method_exception_handling(self, mock_stdio):
+    async def test_run_method_exception_handling(self, mock_stdio, mock_flapi_bridge):
         """Test run() method handles exceptions."""
-        from fruityloops_mcp.server import FLStudioMCPServer
-
         mock_stdio.return_value.__aenter__.side_effect = Exception("Server error")
 
         server = FLStudioMCPServer()

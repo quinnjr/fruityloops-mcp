@@ -1,11 +1,20 @@
 """Tests for MIDI-related server tools."""
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from fruityloops_mcp.server import FLStudioMCPServer
+
+
+@pytest.fixture
+def mock_flapi_bridge():
+    """Mock the Flapi bridge for testing."""
+    with patch("fruityloops_mcp.server.get_bridge") as mock_get_bridge:
+        mock_bridge = MagicMock()
+        mock_get_bridge.return_value = mock_bridge
+        yield mock_bridge
 
 
 @pytest.fixture
@@ -26,10 +35,9 @@ def mock_midi_interface():
 
 
 @pytest.fixture
-def server(mock_midi_interface):
+def server(mock_midi_interface, mock_flapi_bridge):
     """Fixture for a server instance with mocked MIDI."""
-    with patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True):
-        return FLStudioMCPServer()
+    return FLStudioMCPServer()
 
 
 class TestServerMIDITools:
@@ -113,13 +121,12 @@ class TestServerMIDITools:
         assert "Sent MIDI CC" in result
 
     @pytest.mark.asyncio
-    async def test_midi_tools_work_without_fl_studio(self, mock_midi_interface):
-        """Test that MIDI tools can be executed even if FL Studio API is not available."""
-        with patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", False):
-            server = FLStudioMCPServer()
-            result = await server._execute_tool("midi_connect", {})
-            assert "Connected to MIDI port" in result
-            mock_midi_interface.connect.assert_called_once()
+    async def test_midi_tools_work_independently(self, mock_midi_interface, mock_flapi_bridge):
+        """Test that MIDI tools work independently of Flapi."""
+        server = FLStudioMCPServer()
+        result = await server._execute_tool("midi_connect", {})
+        assert "Connected to MIDI port" in result
+        mock_midi_interface.connect.assert_called_once()
 
 
 class TestServerMIDIEdgeCases:
@@ -142,10 +149,9 @@ class TestServerMIDIEdgeCases:
             yield mock_instance
 
     @pytest.fixture
-    def server(self, mock_midi_interface):
+    def server(self, mock_midi_interface, mock_flapi_bridge):
         """Fixture for a server instance with mocked MIDI."""
-        with patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True):
-            return FLStudioMCPServer()
+        return FLStudioMCPServer()
 
     @pytest.mark.asyncio
     @patch("asyncio.sleep", new_callable=AsyncMock)
@@ -170,7 +176,7 @@ class TestServerMIDIEdgeCases:
         assert "Sent MIDI note" in result
 
     @pytest.mark.asyncio
-    async def test_midi_port_name_in_server_init(self):
+    async def test_midi_port_name_in_server_init(self, mock_flapi_bridge):
         """Test that the midi_port name is passed correctly to MIDIInterface."""
         custom_port_name = "MyCustomMIDI"
         with patch("fruityloops_mcp.server.MIDIInterface") as MockMIDI:

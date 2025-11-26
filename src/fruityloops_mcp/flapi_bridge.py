@@ -13,8 +13,8 @@ Setup Requirements:
 """
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -619,4 +619,3 @@ def get_bridge() -> FLStudioBridge:
     if _bridge is None:
         _bridge = FLStudioBridge()
     return _bridge
-
