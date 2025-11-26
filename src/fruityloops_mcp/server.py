@@ -1,4 +1,13 @@
-"""Main MCP server implementation for FL Studio API."""
+"""Main MCP server implementation for FL Studio API via Flapi.
+
+This server provides MCP tools for controlling FL Studio through:
+1. Flapi - A bridge that forwards FL Studio API calls to FL Studio via MIDI
+2. Direct MIDI - For sending MIDI notes, CC, and other MIDI messages
+
+Architecture:
+    Claude Desktop → MCP Server → Flapi → FL Studio (internal Python)
+                              ↘ MIDI Interface → FL Studio (MIDI input)
+"""
 
 import asyncio
 import logging
@@ -8,6 +17,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from fruityloops_mcp.flapi_bridge import FLStudioBridge, get_bridge
 from fruityloops_mcp.midi_interface import MIDIInterface
 
 # Configure logging
@@ -15,56 +25,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# Create stub module class for when FL Studio API is not available
-class StubModule:
-    """A stub module that returns itself for any attribute access or call."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def __getattr__(self, item: str) -> "StubModule":
-        return self
-
-    def __call__(self, *_args: Any, **_kwargs: Any) -> "StubModule":
-        return self
-
-
-# Import FL Studio API modules (these will only work when FL Studio is running)
-try:
-    import channels
-    import general
-    import mixer
-    import patterns
-    import playlist
-    import transport
-    import ui
-
-    FL_STUDIO_AVAILABLE = True
-except ImportError:
-    logger.warning("FL Studio API not available. Running in stub mode.")
-    FL_STUDIO_AVAILABLE = False
-
-    # Create stub modules that return themselves for any attribute access
-    transport = StubModule("transport")
-    mixer = StubModule("mixer")
-    channels = StubModule("channels")
-    patterns = StubModule("patterns")
-    general = StubModule("general")
-    ui = StubModule("ui")
-    playlist = StubModule("playlist")
-
-
 class FLStudioMCPServer:
-    """MCP Server for FL Studio Python API integration."""
+    """MCP Server for FL Studio Python API integration via Flapi."""
 
     def __init__(self, midi_port: str = "FLStudio_MIDI"):
         """Initialize the FL Studio MCP server.
 
         Args:
-            midi_port: Name of the MIDI port to use for MIDI interface
+            midi_port: Name of the MIDI port to use for direct MIDI interface
         """
         self.server = Server("fruityloops-mcp")
         self.midi = MIDIInterface(port_name=midi_port)
+        self.flapi_bridge: FLStudioBridge = get_bridge()
         self._setup_handlers()
 
     def _setup_handlers(self) -> None:
@@ -74,10 +46,30 @@ class FLStudioMCPServer:
         async def list_tools() -> list[Tool]:
             """List available tools."""
             tools = [
-                # MIDI Tools (always available)
+                # =========================================================
+                # Flapi Connection Tools
+                # =========================================================
+                Tool(
+                    name="flapi_connect",
+                    description="Connect to FL Studio via Flapi. Must be called before using FL Studio API tools. Requires Flapi to be installed in FL Studio and virtual MIDI ports configured.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="flapi_disconnect",
+                    description="Disconnect from FL Studio via Flapi",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="flapi_status",
+                    description="Get Flapi connection status and test connectivity to FL Studio",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                # =========================================================
+                # MIDI Tools (always available via loopMIDI)
+                # =========================================================
                 Tool(
                     name="midi_connect",
-                    description="Connect to MIDI port",
+                    description="Connect to MIDI port for sending MIDI messages",
                     inputSchema={"type": "object", "properties": {}},
                 ),
                 Tool(
@@ -92,13 +84,13 @@ class FLStudioMCPServer:
                 ),
                 Tool(
                     name="midi_send_note",
-                    description="Send a MIDI note with specified duration",
+                    description="Send a MIDI note with specified duration (note on + wait + note off)",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "note": {
                                 "type": "integer",
-                                "description": "MIDI note number (0-127)",
+                                "description": "MIDI note number (0-127). Middle C is 60.",
                                 "minimum": 0,
                                 "maximum": 127,
                             },
@@ -217,7 +209,7 @@ class FLStudioMCPServer:
                 ),
                 Tool(
                     name="midi_send_program_change",
-                    description="Send a MIDI program change message",
+                    description="Send a MIDI program change message to switch instruments/patches",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -246,7 +238,7 @@ class FLStudioMCPServer:
                         "properties": {
                             "pitch": {
                                 "type": "integer",
-                                "description": "Pitch bend value (-8192 to 8191)",
+                                "description": "Pitch bend value (-8192 to 8191, 0 is center)",
                                 "minimum": -8192,
                                 "maximum": 8191,
                             },
@@ -261,242 +253,444 @@ class FLStudioMCPServer:
                         "required": ["pitch"],
                     },
                 ),
+                # =========================================================
+                # FL Studio Transport Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="transport_start",
+                    description="Start FL Studio playback. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="transport_stop",
+                    description="Stop FL Studio playback. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="transport_record",
+                    description="Toggle recording in FL Studio. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="transport_get_song_pos",
+                    description="Get current song position. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="transport_set_song_pos",
+                    description="Set song position. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "position": {
+                                "type": "integer",
+                                "description": "Song position in ticks",
+                            }
+                        },
+                        "required": ["position"],
+                    },
+                ),
+                Tool(
+                    name="transport_get_bpm",
+                    description="Get current tempo (BPM). Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="transport_set_bpm",
+                    description="Set tempo (BPM). Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "bpm": {
+                                "type": "number",
+                                "description": "Tempo in beats per minute",
+                                "minimum": 10,
+                                "maximum": 522,
+                            }
+                        },
+                        "required": ["bpm"],
+                    },
+                ),
+                # =========================================================
+                # FL Studio Mixer Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="mixer_get_track_volume",
+                    description="Get mixer track volume. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number (0 is master)",
+                            }
+                        },
+                        "required": ["track_num"],
+                    },
+                ),
+                Tool(
+                    name="mixer_set_track_volume",
+                    description="Set mixer track volume. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            },
+                            "volume": {
+                                "type": "number",
+                                "description": "Volume level (0.0-1.0)",
+                                "minimum": 0,
+                                "maximum": 1,
+                            },
+                        },
+                        "required": ["track_num", "volume"],
+                    },
+                ),
+                Tool(
+                    name="mixer_get_track_name",
+                    description="Get mixer track name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            }
+                        },
+                        "required": ["track_num"],
+                    },
+                ),
+                Tool(
+                    name="mixer_set_track_name",
+                    description="Set mixer track name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            },
+                            "name": {"type": "string", "description": "Track name"},
+                        },
+                        "required": ["track_num", "name"],
+                    },
+                ),
+                Tool(
+                    name="mixer_get_track_pan",
+                    description="Get mixer track pan. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            }
+                        },
+                        "required": ["track_num"],
+                    },
+                ),
+                Tool(
+                    name="mixer_set_track_pan",
+                    description="Set mixer track pan. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            },
+                            "pan": {
+                                "type": "number",
+                                "description": "Pan value (-1.0 left to 1.0 right, 0 center)",
+                                "minimum": -1,
+                                "maximum": 1,
+                            },
+                        },
+                        "required": ["track_num", "pan"],
+                    },
+                ),
+                Tool(
+                    name="mixer_mute_track",
+                    description="Mute or unmute a mixer track. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            },
+                            "mute": {
+                                "type": "boolean",
+                                "description": "True to mute, False to unmute",
+                            },
+                        },
+                        "required": ["track_num", "mute"],
+                    },
+                ),
+                Tool(
+                    name="mixer_solo_track",
+                    description="Solo or unsolo a mixer track. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Mixer track number",
+                            },
+                            "solo": {
+                                "type": "boolean",
+                                "description": "True to solo, False to unsolo",
+                            },
+                        },
+                        "required": ["track_num", "solo"],
+                    },
+                ),
+                # =========================================================
+                # FL Studio Channel Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="channels_channel_count",
+                    description="Get total number of channels. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="channels_get_channel_name",
+                    description="Get channel name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "channel_num": {
+                                "type": "integer",
+                                "description": "Channel number",
+                            }
+                        },
+                        "required": ["channel_num"],
+                    },
+                ),
+                Tool(
+                    name="channels_set_channel_volume",
+                    description="Set channel volume. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "channel_num": {
+                                "type": "integer",
+                                "description": "Channel number",
+                            },
+                            "volume": {
+                                "type": "number",
+                                "description": "Volume level (0.0-1.0)",
+                                "minimum": 0,
+                                "maximum": 1,
+                            },
+                        },
+                        "required": ["channel_num", "volume"],
+                    },
+                ),
+                Tool(
+                    name="channels_mute_channel",
+                    description="Mute or unmute a channel. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "channel_num": {
+                                "type": "integer",
+                                "description": "Channel number",
+                            },
+                            "mute": {
+                                "type": "boolean",
+                                "description": "True to mute, False to unmute",
+                            },
+                        },
+                        "required": ["channel_num", "mute"],
+                    },
+                ),
+                Tool(
+                    name="channels_get_channel_color",
+                    description="Get channel color as integer. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "channel_num": {
+                                "type": "integer",
+                                "description": "Channel number",
+                            }
+                        },
+                        "required": ["channel_num"],
+                    },
+                ),
+                Tool(
+                    name="channels_set_channel_color",
+                    description="Set channel color. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "channel_num": {
+                                "type": "integer",
+                                "description": "Channel number",
+                            },
+                            "color": {
+                                "type": "integer",
+                                "description": "Color as integer (RGB)",
+                            },
+                        },
+                        "required": ["channel_num", "color"],
+                    },
+                ),
+                # =========================================================
+                # FL Studio Pattern Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="patterns_pattern_count",
+                    description="Get total number of patterns. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="patterns_get_pattern_name",
+                    description="Get pattern name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pattern_num": {
+                                "type": "integer",
+                                "description": "Pattern number",
+                            }
+                        },
+                        "required": ["pattern_num"],
+                    },
+                ),
+                Tool(
+                    name="patterns_set_pattern_name",
+                    description="Set pattern name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pattern_num": {
+                                "type": "integer",
+                                "description": "Pattern number",
+                            },
+                            "name": {"type": "string", "description": "Pattern name"},
+                        },
+                        "required": ["pattern_num", "name"],
+                    },
+                ),
+                Tool(
+                    name="patterns_get_pattern_length",
+                    description="Get pattern length in beats. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pattern_num": {
+                                "type": "integer",
+                                "description": "Pattern number",
+                            }
+                        },
+                        "required": ["pattern_num"],
+                    },
+                ),
+                Tool(
+                    name="patterns_jump_to_pattern",
+                    description="Jump to a specific pattern. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pattern_num": {
+                                "type": "integer",
+                                "description": "Pattern number to jump to",
+                            }
+                        },
+                        "required": ["pattern_num"],
+                    },
+                ),
+                # =========================================================
+                # FL Studio Playlist Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="playlist_get_track_name",
+                    description="Get playlist track name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Playlist track number",
+                            }
+                        },
+                        "required": ["track_num"],
+                    },
+                ),
+                Tool(
+                    name="playlist_set_track_name",
+                    description="Set playlist track name. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "track_num": {
+                                "type": "integer",
+                                "description": "Playlist track number",
+                            },
+                            "name": {"type": "string", "description": "Track name"},
+                        },
+                        "required": ["track_num", "name"],
+                    },
+                ),
+                # =========================================================
+                # FL Studio General / Project Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="general_get_project_title",
+                    description="Get the current project title. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="general_get_version",
+                    description="Get FL Studio version. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="general_save_project",
+                    description="Save the current project. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                Tool(
+                    name="general_undo",
+                    description="Undo the last action. Requires Flapi connection.",
+                    inputSchema={"type": "object", "properties": {}},
+                ),
+                # =========================================================
+                # FL Studio UI Controls (via Flapi)
+                # =========================================================
+                Tool(
+                    name="ui_show_window",
+                    description="Show a specific FL Studio window. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "window_id": {
+                                "type": "integer",
+                                "description": "Window ID (0=Mixer, 1=Channel Rack, 2=Piano Roll, 3=Browser, 4=Playlist)",
+                            }
+                        },
+                        "required": ["window_id"],
+                    },
+                ),
+                Tool(
+                    name="ui_get_visible",
+                    description="Check if a window is visible. Requires Flapi connection.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "window_id": {
+                                "type": "integer",
+                                "description": "Window ID to check",
+                            }
+                        },
+                        "required": ["window_id"],
+                    },
+                ),
             ]
-
-            # FL Studio tools (only if FL Studio is available)
-            if FL_STUDIO_AVAILABLE:
-                fl_tools = [
-                    # Transport controls
-                    Tool(
-                        name="transport_start",
-                        description="Start FL Studio playback",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="transport_stop",
-                        description="Stop FL Studio playback",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="transport_record",
-                        description="Toggle recording in FL Studio",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="transport_get_song_pos",
-                        description="Get current song position",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="transport_set_song_pos",
-                        description="Set song position",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "position": {
-                                    "type": "integer",
-                                    "description": "Song position in ticks",
-                                }
-                            },
-                            "required": ["position"],
-                        },
-                    ),
-                    # Mixer controls
-                    Tool(
-                        name="mixer_get_track_volume",
-                        description="Get mixer track volume",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "track_num": {
-                                    "type": "integer",
-                                    "description": "Mixer track number",
-                                }
-                            },
-                            "required": ["track_num"],
-                        },
-                    ),
-                    Tool(
-                        name="mixer_set_track_volume",
-                        description="Set mixer track volume",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "track_num": {
-                                    "type": "integer",
-                                    "description": "Mixer track number",
-                                },
-                                "volume": {
-                                    "type": "number",
-                                    "description": "Volume level (0.0-1.0)",
-                                },
-                            },
-                            "required": ["track_num", "volume"],
-                        },
-                    ),
-                    Tool(
-                        name="mixer_get_track_name",
-                        description="Get mixer track name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "track_num": {
-                                    "type": "integer",
-                                    "description": "Mixer track number",
-                                }
-                            },
-                            "required": ["track_num"],
-                        },
-                    ),
-                    Tool(
-                        name="mixer_set_track_name",
-                        description="Set mixer track name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "track_num": {
-                                    "type": "integer",
-                                    "description": "Mixer track number",
-                                },
-                                "name": {"type": "string", "description": "Track name"},
-                            },
-                            "required": ["track_num", "name"],
-                        },
-                    ),
-                    # Channel controls
-                    Tool(
-                        name="channels_channel_count",
-                        description="Get total number of channels",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="channels_get_channel_name",
-                        description="Get channel name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "channel_num": {
-                                    "type": "integer",
-                                    "description": "Channel number",
-                                }
-                            },
-                            "required": ["channel_num"],
-                        },
-                    ),
-                    Tool(
-                        name="channels_set_channel_volume",
-                        description="Set channel volume",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "channel_num": {
-                                    "type": "integer",
-                                    "description": "Channel number",
-                                },
-                                "volume": {
-                                    "type": "number",
-                                    "description": "Volume level (0.0-1.0)",
-                                },
-                            },
-                            "required": ["channel_num", "volume"],
-                        },
-                    ),
-                    Tool(
-                        name="channels_mute_channel",
-                        description="Mute or unmute a channel",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "channel_num": {
-                                    "type": "integer",
-                                    "description": "Channel number",
-                                },
-                                "mute": {
-                                    "type": "boolean",
-                                    "description": "True to mute, False to unmute",
-                                },
-                            },
-                            "required": ["channel_num", "mute"],
-                        },
-                    ),
-                    # Pattern controls
-                    Tool(
-                        name="patterns_pattern_count",
-                        description="Get total number of patterns",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="patterns_get_pattern_name",
-                        description="Get pattern name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "pattern_num": {
-                                    "type": "integer",
-                                    "description": "Pattern number",
-                                }
-                            },
-                            "required": ["pattern_num"],
-                        },
-                    ),
-                    Tool(
-                        name="patterns_set_pattern_name",
-                        description="Set pattern name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "pattern_num": {
-                                    "type": "integer",
-                                    "description": "Pattern number",
-                                },
-                                "name": {"type": "string", "description": "Pattern name"},
-                            },
-                            "required": ["pattern_num", "name"],
-                        },
-                    ),
-                    # General controls
-                    Tool(
-                        name="general_get_project_title",
-                        description="Get the current project title",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    Tool(
-                        name="general_get_version",
-                        description="Get FL Studio version",
-                        inputSchema={"type": "object", "properties": {}},
-                    ),
-                    # UI controls
-                    Tool(
-                        name="ui_show_window",
-                        description="Show a specific FL Studio window",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "window_id": {
-                                    "type": "integer",
-                                    "description": "Window ID to show",
-                                }
-                            },
-                            "required": ["window_id"],
-                        },
-                    ),
-                    # Playlist controls
-                    Tool(
-                        name="playlist_get_track_name",
-                        description="Get playlist track name",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "track_num": {
-                                    "type": "integer",
-                                    "description": "Playlist track number",
-                                }
-                            },
-                            "required": ["track_num"],
-                        },
-                    ),
-                ]
-                tools.extend(fl_tools)
 
             return tools
 
@@ -504,15 +698,6 @@ class FLStudioMCPServer:
         async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Execute a tool by name with given arguments."""
             try:
-                # Check if FL Studio tool is being called without FL Studio available
-                if not name.startswith("midi_") and not FL_STUDIO_AVAILABLE:
-                    return [
-                        TextContent(
-                            type="text",
-                            text=f"FL Studio API not available. Tool '{name}' cannot be executed.",
-                        )
-                    ]
-
                 result = await self._execute_tool(name, arguments)
                 return [TextContent(type="text", text=result)]
             except Exception as e:
@@ -532,8 +717,39 @@ class FLStudioMCPServer:
         Raises:
             ValueError: If tool name is unknown
         """
+        # =================================================================
+        # Flapi Connection Tools
+        # =================================================================
+        if name == "flapi_connect":
+            success = self.flapi_bridge.enable()
+            if success:
+                return "Connected to FL Studio via Flapi. FL Studio API tools are now available."
+            else:
+                return (
+                    "Failed to connect to FL Studio via Flapi. "
+                    "Make sure:\n"
+                    "1. Flapi is installed: pip install flapi && flapi install\n"
+                    "2. Virtual MIDI ports 'Flapi Request' and 'Flapi Response' are created (use loopMIDI on Windows)\n"
+                    "3. FL Studio is running with the Flapi script enabled\n"
+                    "4. FL Studio MIDI settings are configured for Flapi ports"
+                )
+        elif name == "flapi_disconnect":
+            self.flapi_bridge.disable()
+            return "Disconnected from FL Studio via Flapi"
+        elif name == "flapi_status":
+            status_parts = [
+                f"Flapi library available: {self.flapi_bridge.is_available}",
+                f"Flapi enabled: {self.flapi_bridge.is_enabled}",
+            ]
+            if self.flapi_bridge.is_enabled:
+                connected = self.flapi_bridge.test_connection()
+                status_parts.append(f"FL Studio connection: {'OK' if connected else 'FAILED'}")
+            return "\n".join(status_parts)
+
+        # =================================================================
         # MIDI Tools
-        if name == "midi_connect":
+        # =================================================================
+        elif name == "midi_connect":
             success = self.midi.connect()
             return (
                 f"Connected to MIDI port: {self.midi.port_name}"
@@ -605,96 +821,134 @@ class FLStudioMCPServer:
                 else f"Failed to send MIDI pitch bend: pitch={pitch}"
             )
 
-        # FL Studio Transport Tools
+        # =================================================================
+        # FL Studio Transport Tools (via Flapi)
+        # =================================================================
         elif name == "transport_start":
-            transport.start()
-            return "FL Studio playback started"
+            return self.flapi_bridge.transport_start()
         elif name == "transport_stop":
-            transport.stop()
-            return "FL Studio playback stopped"
+            return self.flapi_bridge.transport_stop()
         elif name == "transport_record":
-            transport.record()
-            return "FL Studio recording toggled"
+            return self.flapi_bridge.transport_record()
         elif name == "transport_get_song_pos":
-            pos = transport.getSongPos()
-            return f"Current song position: {pos}"
+            return self.flapi_bridge.transport_get_song_pos()
         elif name == "transport_set_song_pos":
             position = args["position"]
-            transport.setSongPos(position)
-            return f"Song position set to: {position}"
+            return self.flapi_bridge.transport_set_song_pos(position)
+        elif name == "transport_get_bpm":
+            return self.flapi_bridge.transport_get_bpm()
+        elif name == "transport_set_bpm":
+            bpm = args["bpm"]
+            return self.flapi_bridge.transport_set_bpm(bpm)
 
-        # FL Studio Mixer Tools
+        # =================================================================
+        # FL Studio Mixer Tools (via Flapi)
+        # =================================================================
         elif name == "mixer_get_track_volume":
             track_num = args["track_num"]
-            volume = mixer.getTrackVolume(track_num)
-            return f"Track {track_num} volume: {volume}"
+            return self.flapi_bridge.mixer_get_track_volume(track_num)
         elif name == "mixer_set_track_volume":
             track_num = args["track_num"]
             volume = args["volume"]
-            mixer.setTrackVolume(track_num, volume)
-            return f"Track {track_num} volume set to: {volume}"
+            return self.flapi_bridge.mixer_set_track_volume(track_num, volume)
         elif name == "mixer_get_track_name":
             track_num = args["track_num"]
-            name_str = mixer.getTrackName(track_num)
-            return f"Track {track_num} name: {name_str}"
+            return self.flapi_bridge.mixer_get_track_name(track_num)
         elif name == "mixer_set_track_name":
             track_num = args["track_num"]
             name_str = args["name"]
-            mixer.setTrackName(track_num, name_str)
-            return f"Track {track_num} name set to: {name_str}"
+            return self.flapi_bridge.mixer_set_track_name(track_num, name_str)
+        elif name == "mixer_get_track_pan":
+            track_num = args["track_num"]
+            return self.flapi_bridge.mixer_get_track_pan(track_num)
+        elif name == "mixer_set_track_pan":
+            track_num = args["track_num"]
+            pan = args["pan"]
+            return self.flapi_bridge.mixer_set_track_pan(track_num, pan)
+        elif name == "mixer_mute_track":
+            track_num = args["track_num"]
+            mute = args["mute"]
+            return self.flapi_bridge.mixer_mute_track(track_num, mute)
+        elif name == "mixer_solo_track":
+            track_num = args["track_num"]
+            solo = args["solo"]
+            return self.flapi_bridge.mixer_solo_track(track_num, solo)
 
-        # FL Studio Channel Tools
+        # =================================================================
+        # FL Studio Channel Tools (via Flapi)
+        # =================================================================
         elif name == "channels_channel_count":
-            count = channels.channelCount()
-            return f"Total channels: {count}"
+            return self.flapi_bridge.channels_count()
         elif name == "channels_get_channel_name":
             channel_num = args["channel_num"]
-            name_str = channels.getChannelName(channel_num)
-            return f"Channel {channel_num} name: {name_str}"
+            return self.flapi_bridge.channels_get_name(channel_num)
         elif name == "channels_set_channel_volume":
             channel_num = args["channel_num"]
             volume = args["volume"]
-            channels.setChannelVolume(channel_num, volume)
-            return f"Channel {channel_num} volume set to: {volume}"
+            return self.flapi_bridge.channels_set_volume(channel_num, volume)
         elif name == "channels_mute_channel":
             channel_num = args["channel_num"]
             mute = args["mute"]
-            channels.muteChannel(channel_num, mute)
-            return f"Channel {channel_num} {'muted' if mute else 'unmuted'}"
+            return self.flapi_bridge.channels_mute(channel_num, mute)
+        elif name == "channels_get_channel_color":
+            channel_num = args["channel_num"]
+            return self.flapi_bridge.channels_get_color(channel_num)
+        elif name == "channels_set_channel_color":
+            channel_num = args["channel_num"]
+            color = args["color"]
+            return self.flapi_bridge.channels_set_color(channel_num, color)
 
-        # FL Studio Pattern Tools
+        # =================================================================
+        # FL Studio Pattern Tools (via Flapi)
+        # =================================================================
         elif name == "patterns_pattern_count":
-            count = patterns.patternCount()
-            return f"Total patterns: {count}"
+            return self.flapi_bridge.patterns_count()
         elif name == "patterns_get_pattern_name":
             pattern_num = args["pattern_num"]
-            name_str = patterns.getPatternName(pattern_num)
-            return f"Pattern {pattern_num} name: {name_str}"
+            return self.flapi_bridge.patterns_get_name(pattern_num)
         elif name == "patterns_set_pattern_name":
             pattern_num = args["pattern_num"]
             name_str = args["name"]
-            patterns.setPatternName(pattern_num, name_str)
-            return f"Pattern {pattern_num} name set to: {name_str}"
+            return self.flapi_bridge.patterns_set_name(pattern_num, name_str)
+        elif name == "patterns_get_pattern_length":
+            pattern_num = args["pattern_num"]
+            return self.flapi_bridge.patterns_get_length(pattern_num)
+        elif name == "patterns_jump_to_pattern":
+            pattern_num = args["pattern_num"]
+            return self.flapi_bridge.patterns_jump_to(pattern_num)
 
-        # FL Studio General Tools
-        elif name == "general_get_project_title":
-            title = general.getProjectTitle()
-            return f"Project title: {title}"
-        elif name == "general_get_version":
-            version = general.getVersion()
-            return f"FL Studio version: {version}"
-
-        # FL Studio UI Tools
-        elif name == "ui_show_window":
-            window_id = args["window_id"]
-            ui.showWindow(window_id)
-            return f"Showing window: {window_id}"
-
-        # FL Studio Playlist Tools
+        # =================================================================
+        # FL Studio Playlist Tools (via Flapi)
+        # =================================================================
         elif name == "playlist_get_track_name":
             track_num = args["track_num"]
-            name_str = playlist.getTrackName(track_num)
-            return f"Playlist track {track_num} name: {name_str}"
+            return self.flapi_bridge.playlist_get_track_name(track_num)
+        elif name == "playlist_set_track_name":
+            track_num = args["track_num"]
+            name_str = args["name"]
+            return self.flapi_bridge.playlist_set_track_name(track_num, name_str)
+
+        # =================================================================
+        # FL Studio General / Project Tools (via Flapi)
+        # =================================================================
+        elif name == "general_get_project_title":
+            return self.flapi_bridge.general_get_project_title()
+        elif name == "general_get_version":
+            return self.flapi_bridge.general_get_version()
+        elif name == "general_save_project":
+            return self.flapi_bridge.general_save_project()
+        elif name == "general_undo":
+            return self.flapi_bridge.general_undo()
+
+        # =================================================================
+        # FL Studio UI Tools (via Flapi)
+        # =================================================================
+        elif name == "ui_show_window":
+            window_id = args["window_id"]
+            return self.flapi_bridge.ui_show_window(window_id)
+        elif name == "ui_get_visible":
+            window_id = args["window_id"]
+            return self.flapi_bridge.ui_get_visible(window_id)
 
         else:
             raise ValueError(f"Unknown tool: {name}")
@@ -715,6 +969,7 @@ class FLStudioMCPServer:
 def main() -> None:
     """Main entry point for the FL Studio MCP server."""
     logger.info("FL Studio MCP Server starting...")
+    logger.info("Using Flapi for FL Studio API communication")
     server = FLStudioMCPServer()
     asyncio.run(server.run())
 
