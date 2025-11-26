@@ -1,6 +1,6 @@
 """Integration tests for the FL Studio MCP server."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,27 +8,18 @@ from fruityloops_mcp.server import FLStudioMCPServer
 
 
 @pytest.fixture
-def mock_fl_modules():
-    """Mock FL Studio API modules."""
-    with (
-        patch("fruityloops_mcp.server.transport") as mock_transport,
-        patch("fruityloops_mcp.server.mixer") as mock_mixer,
-        patch("fruityloops_mcp.server.channels") as mock_channels,
-        patch("fruityloops_mcp.server.patterns") as mock_patterns,
-        patch("fruityloops_mcp.server.general") as mock_general,
-        patch("fruityloops_mcp.server.ui") as mock_ui,
-        patch("fruityloops_mcp.server.playlist") as mock_playlist,
-        patch("fruityloops_mcp.server.FL_STUDIO_AVAILABLE", True),
-    ):
-        yield {
-            "transport": mock_transport,
-            "mixer": mock_mixer,
-            "channels": mock_channels,
-            "patterns": mock_patterns,
-            "general": mock_general,
-            "ui": mock_ui,
-            "playlist": mock_playlist,
-        }
+def mock_flapi_bridge():
+    """Mock the Flapi bridge for testing."""
+    with patch("fruityloops_mcp.server.get_bridge") as mock_get_bridge:
+        mock_bridge = MagicMock()
+        # Set up default return values for FL Studio methods
+        mock_bridge.transport_start.return_value = "FL Studio playback started"
+        mock_bridge.transport_stop.return_value = "FL Studio playback stopped"
+        mock_bridge.transport_record.return_value = "FL Studio recording toggled"
+        mock_bridge.mixer_set_track_name.return_value = "Track 0 name set to: Test"
+        mock_bridge.mixer_set_track_volume.return_value = "Track 0 volume set to: 0.0"
+        mock_get_bridge.return_value = mock_bridge
+        yield mock_bridge
 
 
 @pytest.fixture
@@ -41,6 +32,7 @@ def mock_midi():
         mock_instance.send_note_on.return_value = True
         mock_instance.send_note_off.return_value = True
         mock_instance.list_ports.return_value = {"input": [], "output": []}
+        mock_instance.port_name = "FLStudio_MIDI"
         yield mock_instance
 
 
@@ -48,7 +40,7 @@ class TestIntegration:
     """Integration tests for the server."""
 
     @pytest.mark.asyncio
-    async def test_server_full_workflow(self, mock_fl_modules, mock_midi):
+    async def test_server_full_workflow(self, mock_flapi_bridge, mock_midi):
         """Test a complete workflow with FL Studio and MIDI."""
         server = FLStudioMCPServer()
 
@@ -57,10 +49,10 @@ class TestIntegration:
         assert "Connected" in result
         mock_midi.connect.assert_called_once()
 
-        # Test FL Studio transport
+        # Test FL Studio transport via Flapi
         result = await server._execute_tool("transport_start", {})
         assert "started" in result
-        mock_fl_modules["transport"].start.assert_called_once()
+        mock_flapi_bridge.transport_start.assert_called_once()
 
         # Test sending MIDI note
         with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -73,25 +65,25 @@ class TestIntegration:
         mock_midi.disconnect.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_multiple_tools_execution(self, mock_fl_modules, mock_midi):
+    async def test_multiple_tools_execution(self, mock_flapi_bridge, mock_midi):
         """Test executing multiple tools in sequence."""
         server = FLStudioMCPServer()
 
-        # Execute multiple transport commands
+        # Execute multiple transport commands via Flapi
         await server._execute_tool("transport_start", {})
         await server._execute_tool("transport_stop", {})
         await server._execute_tool("transport_record", {})
 
-        mock_fl_modules["transport"].start.assert_called_once()
-        mock_fl_modules["transport"].stop.assert_called_once()
-        mock_fl_modules["transport"].record.assert_called_once()
+        mock_flapi_bridge.transport_start.assert_called_once()
+        mock_flapi_bridge.transport_stop.assert_called_once()
+        mock_flapi_bridge.transport_record.assert_called_once()
 
 
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
     @pytest.mark.asyncio
-    async def test_long_name(self, mock_fl_modules, mock_midi):
+    async def test_long_name(self, mock_flapi_bridge, mock_midi):
         """Test with very long names."""
         server = FLStudioMCPServer()
         long_name = "A" * 1000
@@ -100,10 +92,10 @@ class TestEdgeCases:
             "mixer_set_track_name", {"track_num": 0, "name": long_name}
         )
         assert "set to" in result
-        mock_fl_modules["mixer"].setTrackName.assert_called_once_with(0, long_name)
+        mock_flapi_bridge.mixer_set_track_name.assert_called_once_with(0, long_name)
 
     @pytest.mark.asyncio
-    async def test_zero_values(self, mock_fl_modules, mock_midi):
+    async def test_zero_values(self, mock_flapi_bridge, mock_midi):
         """Test with zero values."""
         server = FLStudioMCPServer()
 
@@ -111,4 +103,4 @@ class TestEdgeCases:
             "mixer_set_track_volume", {"track_num": 0, "volume": 0.0}
         )
         assert "set to" in result
-        mock_fl_modules["mixer"].setTrackVolume.assert_called_once_with(0, 0.0)
+        mock_flapi_bridge.mixer_set_track_volume.assert_called_once_with(0, 0.0)
