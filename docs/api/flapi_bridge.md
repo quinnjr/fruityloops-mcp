@@ -40,11 +40,11 @@ bridge = get_bridge()
 # Enable Flapi connection
 if bridge.enable():
     print("Connected to FL Studio!")
-    
+
     # Control FL Studio
     print(bridge.transport_start())
     print(bridge.transport_get_bpm())
-    
+
     # Disconnect when done
     bridge.disable()
 ```
