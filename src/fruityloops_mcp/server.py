@@ -8,50 +8,16 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from fruityloops_mcp.fl_bridge_client import FLBridgeClient
 from fruityloops_mcp.midi_interface import MIDIInterface
+
+# FL Studio tools are always available through the bridge client
+# The actual connection availability is checked at runtime
+FL_STUDIO_AVAILABLE = True
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-# Create stub module class for when FL Studio API is not available
-class StubModule:
-    """A stub module that returns itself for any attribute access or call."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def __getattr__(self, item: str) -> "StubModule":
-        return self
-
-    def __call__(self, *_args: Any, **_kwargs: Any) -> "StubModule":
-        return self
-
-
-# Import FL Studio API modules (these will only work when FL Studio is running)
-try:
-    import channels
-    import general
-    import mixer
-    import patterns
-    import playlist
-    import transport
-    import ui
-
-    FL_STUDIO_AVAILABLE = True
-except ImportError:
-    logger.warning("FL Studio API not available. Running in stub mode.")
-    FL_STUDIO_AVAILABLE = False
-
-    # Create stub modules that return themselves for any attribute access
-    transport = StubModule("transport")
-    mixer = StubModule("mixer")
-    channels = StubModule("channels")
-    patterns = StubModule("patterns")
-    general = StubModule("general")
-    ui = StubModule("ui")
-    playlist = StubModule("playlist")
 
 
 class FLStudioMCPServer:
@@ -65,6 +31,7 @@ class FLStudioMCPServer:
         """
         self.server = Server("fruityloops-mcp")
         self.midi = MIDIInterface(port_name=midi_port)
+        self.fl_bridge = FLBridgeClient()
         self._setup_handlers()
 
     def _setup_handlers(self) -> None:
@@ -504,12 +471,12 @@ class FLStudioMCPServer:
         async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Execute a tool by name with given arguments."""
             try:
-                # Check if FL Studio tool is being called without FL Studio available
-                if not name.startswith("midi_") and not FL_STUDIO_AVAILABLE:
+                # Check if FL Studio tool is being called without FL Studio Bridge available
+                if not name.startswith("midi_") and not self.fl_bridge.is_available():
                     return [
                         TextContent(
                             type="text",
-                            text=f"FL Studio API not available. Tool '{name}' cannot be executed.",
+                            text=f"FL Studio Bridge not available. Tool '{name}' cannot be executed. Make sure FL Studio is running with the bridge script loaded.",
                         )
                     ]
 
@@ -607,94 +574,150 @@ class FLStudioMCPServer:
 
         # FL Studio Transport Tools
         elif name == "transport_start":
-            transport.start()
-            return "FL Studio playback started"
+            result = self.fl_bridge.transport_start()
+            return f"FL Studio playback started: {result}" if result else "Failed to start playback"
         elif name == "transport_stop":
-            transport.stop()
-            return "FL Studio playback stopped"
+            result = self.fl_bridge.transport_stop()
+            return f"FL Studio playback stopped: {result}" if result else "Failed to stop playback"
         elif name == "transport_record":
-            transport.record()
-            return "FL Studio recording toggled"
+            result = self.fl_bridge.transport_record()
+            return (
+                f"FL Studio recording toggled: {result}" if result else "Failed to toggle recording"
+            )
         elif name == "transport_get_song_pos":
-            pos = transport.getSongPos()
-            return f"Current song position: {pos}"
+            pos = self.fl_bridge.transport_get_song_pos()
+            return (
+                f"Current song position: {pos}"
+                if pos is not None
+                else "Failed to get song position"
+            )
         elif name == "transport_set_song_pos":
             position = args["position"]
-            transport.setSongPos(position)
-            return f"Song position set to: {position}"
+            result = self.fl_bridge.transport_set_song_pos(position)
+            return f"Song position set to: {position}" if result else "Failed to set song position"
 
         # FL Studio Mixer Tools
         elif name == "mixer_get_track_volume":
             track_num = args["track_num"]
-            volume = mixer.getTrackVolume(track_num)
-            return f"Track {track_num} volume: {volume}"
+            volume = self.fl_bridge.mixer_get_track_volume(track_num)
+            return (
+                f"Track {track_num} volume: {volume}"
+                if volume is not None
+                else f"Failed to get volume for track {track_num}"
+            )
         elif name == "mixer_set_track_volume":
             track_num = args["track_num"]
             volume = args["volume"]
-            mixer.setTrackVolume(track_num, volume)
-            return f"Track {track_num} volume set to: {volume}"
+            result = self.fl_bridge.mixer_set_track_volume(track_num, volume)
+            return (
+                f"Track {track_num} volume set to: {volume}"
+                if result
+                else f"Failed to set volume for track {track_num}"
+            )
         elif name == "mixer_get_track_name":
             track_num = args["track_num"]
-            name_str = mixer.getTrackName(track_num)
-            return f"Track {track_num} name: {name_str}"
+            name_str = self.fl_bridge.mixer_get_track_name(track_num)
+            return (
+                f"Track {track_num} name: {name_str}"
+                if name_str is not None
+                else f"Failed to get name for track {track_num}"
+            )
         elif name == "mixer_set_track_name":
             track_num = args["track_num"]
             name_str = args["name"]
-            mixer.setTrackName(track_num, name_str)
-            return f"Track {track_num} name set to: {name_str}"
+            result = self.fl_bridge.mixer_set_track_name(track_num, name_str)
+            return (
+                f"Track {track_num} name set to: {name_str}"
+                if result
+                else f"Failed to set name for track {track_num}"
+            )
 
         # FL Studio Channel Tools
         elif name == "channels_channel_count":
-            count = channels.channelCount()
-            return f"Total channels: {count}"
+            count = self.fl_bridge.channels_channel_count()
+            return (
+                f"Total channels: {count}" if count is not None else "Failed to get channel count"
+            )
         elif name == "channels_get_channel_name":
             channel_num = args["channel_num"]
-            name_str = channels.getChannelName(channel_num)
-            return f"Channel {channel_num} name: {name_str}"
+            name_str = self.fl_bridge.channels_get_channel_name(channel_num)
+            return (
+                f"Channel {channel_num} name: {name_str}"
+                if name_str is not None
+                else f"Failed to get name for channel {channel_num}"
+            )
         elif name == "channels_set_channel_volume":
             channel_num = args["channel_num"]
             volume = args["volume"]
-            channels.setChannelVolume(channel_num, volume)
-            return f"Channel {channel_num} volume set to: {volume}"
+            result = self.fl_bridge.channels_set_channel_volume(channel_num, volume)
+            return (
+                f"Channel {channel_num} volume set to: {volume}"
+                if result
+                else f"Failed to set volume for channel {channel_num}"
+            )
         elif name == "channels_mute_channel":
             channel_num = args["channel_num"]
             mute = args["mute"]
-            channels.muteChannel(channel_num, mute)
-            return f"Channel {channel_num} {'muted' if mute else 'unmuted'}"
+            result = self.fl_bridge.channels_mute_channel(channel_num, mute)
+            return (
+                f"Channel {channel_num} {'muted' if mute else 'unmuted'}"
+                if result
+                else f"Failed to mute/unmute channel {channel_num}"
+            )
 
         # FL Studio Pattern Tools
         elif name == "patterns_pattern_count":
-            count = patterns.patternCount()
-            return f"Total patterns: {count}"
+            count = self.fl_bridge.patterns_pattern_count()
+            return (
+                f"Total patterns: {count}" if count is not None else "Failed to get pattern count"
+            )
         elif name == "patterns_get_pattern_name":
             pattern_num = args["pattern_num"]
-            name_str = patterns.getPatternName(pattern_num)
-            return f"Pattern {pattern_num} name: {name_str}"
+            name_str = self.fl_bridge.patterns_get_pattern_name(pattern_num)
+            return (
+                f"Pattern {pattern_num} name: {name_str}"
+                if name_str is not None
+                else f"Failed to get name for pattern {pattern_num}"
+            )
         elif name == "patterns_set_pattern_name":
             pattern_num = args["pattern_num"]
             name_str = args["name"]
-            patterns.setPatternName(pattern_num, name_str)
-            return f"Pattern {pattern_num} name set to: {name_str}"
+            result = self.fl_bridge.patterns_set_pattern_name(pattern_num, name_str)
+            return (
+                f"Pattern {pattern_num} name set to: {name_str}"
+                if result
+                else f"Failed to set name for pattern {pattern_num}"
+            )
 
         # FL Studio General Tools
         elif name == "general_get_project_title":
-            title = general.getProjectTitle()
-            return f"Project title: {title}"
+            title = self.fl_bridge.general_get_project_title()
+            return f"Project title: {title}" if title is not None else "Failed to get project title"
         elif name == "general_get_version":
-            version = general.getVersion()
-            return f"FL Studio version: {version}"
+            version = self.fl_bridge.general_get_version()
+            return (
+                f"FL Studio version: {version}"
+                if version is not None
+                else "Failed to get FL Studio version"
+            )
 
         # FL Studio UI Tools
         elif name == "ui_show_window":
             window_id = args["window_id"]
-            ui.showWindow(window_id)
-            return f"Showing window: {window_id}"
+            result = self.fl_bridge.ui_show_window(window_id)
+            return (
+                f"Showing window: {window_id}" if result else f"Failed to show window {window_id}"
+            )
 
         # FL Studio Playlist Tools
         elif name == "playlist_get_track_name":
             track_num = args["track_num"]
-            name_str = playlist.getTrackName(track_num)
-            return f"Playlist track {track_num} name: {name_str}"
+            name_str = self.fl_bridge.playlist_get_track_name(track_num)
+            return (
+                f"Playlist track {track_num} name: {name_str}"
+                if name_str is not None
+                else f"Failed to get name for playlist track {track_num}"
+            )
 
         else:
             raise ValueError(f"Unknown tool: {name}")
