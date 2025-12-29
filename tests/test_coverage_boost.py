@@ -211,52 +211,40 @@ class TestServerMIDINoteHandler:
         mock_midi.send_note_off.assert_called_once_with(60, 100, 1)
 
 
-class TestStubModule:
-    """Test the StubModule class for FL Studio API fallback."""
+class TestFLBridgeClient:
+    """Test the FL Bridge client integration."""
 
-    def test_stub_module_creation(self):
-        """Test creating a StubModule."""
-        from fruityloops_mcp.server import StubModule
+    def test_bridge_client_initialization(self):
+        """Test creating an FL Bridge client."""
+        from fruityloops_mcp.fl_bridge_client import FLBridgeClient
 
-        stub = StubModule("test_module")
-        assert stub._name == "test_module"
+        client = FLBridgeClient()
+        assert client.host == "127.0.0.1"
+        assert client.port == 25100
+        assert client.connected is False
 
-    def test_stub_module_getattr_chain(self):
-        """Test that StubModule returns itself for attribute access chains."""
-        from fruityloops_mcp.server import StubModule
+    def test_bridge_client_custom_settings(self):
+        """Test FL Bridge client with custom host and port."""
+        from fruityloops_mcp.fl_bridge_client import FLBridgeClient
 
-        stub = StubModule("test")
-        # Chain attribute access
-        result = stub.some.nested.attribute.chain
-        assert isinstance(result, StubModule)
+        client = FLBridgeClient(host="localhost", port=12345)
+        assert client.host == "localhost"
+        assert client.port == 12345
 
-    def test_stub_module_call_returns_self(self):
-        """Test that calling StubModule returns itself."""
-        from fruityloops_mcp.server import StubModule
+    def test_bridge_client_is_available_when_not_connected(self):
+        """Test is_available returns False and tries to connect when not connected."""
+        from fruityloops_mcp.fl_bridge_client import FLBridgeClient
 
-        stub = StubModule("test")
-        result = stub()
-        assert result is stub
+        client = FLBridgeClient()
+        # is_available should try to connect and return False when not connected
+        result = client.is_available()
+        assert result is False  # Can't connect to non-existent bridge
 
-    def test_stub_module_call_with_args(self):
-        """Test calling StubModule with arguments."""
-        from fruityloops_mcp.server import StubModule
-
-        stub = StubModule("test")
-        result = stub(arg1="value", arg2=42)
-        assert isinstance(result, StubModule)
-
-    def test_stub_module_complex_chain(self):
-        """Test complex chain of attributes and calls."""
-        from fruityloops_mcp.server import StubModule
-
-        stub = StubModule("fl_api")
-        # Simulate FL Studio API usage pattern
-        result = stub.transport.start()
-        assert isinstance(result, StubModule)
-
-        result2 = stub.mixer.getTrackVolume(0)
-        assert isinstance(result2, StubModule)
+    def test_server_has_fl_bridge_client(self):
+        """Test that server has FL Bridge client."""
+        server = FLStudioMCPServer()
+        assert hasattr(server, "fl_bridge")
+        assert server.fl_bridge is not None
 
 
 class TestServerRunMethod:

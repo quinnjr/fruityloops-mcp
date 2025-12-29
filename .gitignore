@@ -33,6 +33,8 @@ env/
 # IDEs
 .vscode/
 .idea/
+.claude/
+.cursor/
 *.swp
 *.swo
 *~
